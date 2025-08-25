@@ -12,6 +12,18 @@ export const Projects: CollectionConfig = {
       type: 'textarea',
     },
     {
+      name: 'metadata',
+      type: 'group',
+      fields: [
+        {
+          name: 'technologies',
+          type: 'relationship',
+          relationTo: 'technologies',
+          hasMany: true,
+        },
+      ],
+    },
+    {
       label: 'links',
       type: 'collapsible',
       fields: [

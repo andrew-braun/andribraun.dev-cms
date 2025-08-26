@@ -9,7 +9,7 @@ export const Projects: CollectionConfig = {
     },
     {
       name: 'description',
-      type: 'textarea',
+      type: 'richText',
     },
     {
       name: 'metadata',

@@ -1,0 +1,59 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # allows manual triggers
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10 # or your version
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22' # match your version
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+        env:
+          # Add your build-time env vars here
+          #   DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+
+      - name: Deploy to server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
+
+          # Sync build files
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            --exclude 'node_modules' \
+            --exclude '.git' \
+            .next/ $SERVER_USER@$SERVER_HOST:/var/www/your-app/.next/
+
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+            package.json pnpm-lock.yaml public/ \
+            $SERVER_USER@$SERVER_HOST:/var/www/your-app/
+
+          # Restart app on server
+          ssh -i ~/.ssh/deploy_key $SERVER_USER@$SERVER_HOST \
+            "cd /var/www/your-app && pnpm install --prod && pm2 reload ecosystem.config.js --update-env"

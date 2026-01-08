@@ -23,20 +23,32 @@ export const Technologies: CollectionConfig = {
       type: 'select',
       options: [
         {
-          label: 'Frontend',
-          value: 'frontend',
-        },
-        {
           label: 'Backend',
           value: 'backend',
+        },
+        {
+          label: 'CMS',
+          value: 'cms',
         },
         {
           label: 'Database',
           value: 'database',
         },
         {
-          label: 'CMS',
-          value: 'cms',
+          label: 'Design',
+          value: 'design',
+        },
+        {
+          label: 'DevOps',
+          value: 'devops',
+        },
+        {
+          label: 'Framework',
+          value: 'framework',
+        },
+        {
+          label: 'Frontend',
+          value: 'frontend',
         },
         {
           label: 'Language',
@@ -45,10 +57,6 @@ export const Technologies: CollectionConfig = {
         {
           label: 'Tool',
           value: 'tool',
-        },
-        {
-          label: 'Framework',
-          value: 'framework',
         },
       ],
       hasMany: true,

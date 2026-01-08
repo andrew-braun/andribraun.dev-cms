@@ -43,9 +43,16 @@ export const Projects: CollectionConfig = {
       type: 'collapsible',
       fields: [
         {
+          name: 'thumbnail',
+          type: 'upload',
+          relationTo: 'media',
+        },
+        {
           name: 'images',
           type: 'upload',
           relationTo: 'media',
+          unique: true,
+          hasMany: true,
         },
       ],
     },

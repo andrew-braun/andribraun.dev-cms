@@ -193,7 +193,8 @@ export interface Project {
   liveLink?: string | null;
   snapshotLink?: string | null;
   githubLink?: string | null;
-  images?: (number | null) | Media;
+  thumbnail?: (number | null) | Media;
+  images?: (number | Media)[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -206,7 +207,9 @@ export interface Technology {
   name?: string | null;
   description?: string | null;
   link?: string | null;
-  category?: ('frontend' | 'backend' | 'database' | 'cms' | 'language' | 'tool' | 'framework')[] | null;
+  category?:
+    | ('backend' | 'cms' | 'database' | 'design' | 'devops' | 'framework' | 'frontend' | 'language' | 'tool')[]
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -362,6 +365,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   liveLink?: T;
   snapshotLink?: T;
   githubLink?: T;
+  thumbnail?: T;
   images?: T;
   updatedAt?: T;
   createdAt?: T;

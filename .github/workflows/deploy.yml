@@ -49,10 +49,11 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          secrets: |
+            database_uri=${{ secrets.DATABASE_URI_BUILD }}
+            payload_secret=${{ secrets.PAYLOAD_SECRET }}
           secret-files: |
-            "database_uri=${{ secrets.DATABASE_URI_BUILD }}"
-            "payload_secret=${{ secrets.PAYLOAD_SECRET }}"
-            "ca_cert=/tmp/ca-cert.pem"
+            ca_cert=/tmp/ca-cert.pem
 
       - name: Trigger Coolify Deployment
         run: |

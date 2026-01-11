@@ -43,9 +43,10 @@ COPY . .
 # Use BuildKit secrets to securely pass sensitive data
 RUN --mount=type=secret,id=database_uri \
     --mount=type=secret,id=payload_secret \
+    --mount=type=secret,id=ca_cert \
     export DATABASE_URI=$(cat /run/secrets/database_uri) && \
     export PAYLOAD_SECRET=$(cat /run/secrets/payload_secret) && \
-    echo "Database URI" $DATABASE_URI && \
+    export PGSSLROOTCERT=/run/secrets/ca_cert && \
     if [ -f yarn.lock ]; then yarn run build; \
     elif [ -f package-lock.json ]; then npm run build; \
     elif [ -f pnpm-lock.yaml ]; then pnpm run build; \

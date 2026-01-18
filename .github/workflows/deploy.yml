@@ -52,7 +52,7 @@ jobs:
       - name: Trigger Dokploy Deployment
         run: |
           curl -X 'POST' \
-          'https://dopkloy.andribraun.dev/api/application.deploy' \
+          'https://dokploy.andribraun.dev/api/application.deploy' \
           -H 'accept: application/json' \
           -H 'x-api-key: ${{ secrets.DOKPLOY_API_KEY }}' \
           -H 'Content-Type: application/json' \

@@ -1,4 +1,4 @@
-name: Build and Deploy to Coolify
+name: Build and Deploy to Dokploy
 
 on:
   push:
@@ -45,11 +45,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
           secrets: |
             database_uri=${{ secrets.DATABASE_URI_BUILD }}
             payload_secret=${{ secrets.PAYLOAD_SECRET }}
-
-      - name: Trigger Coolify Deployment
+      - name: Trigger Dokploy Deployment
         run: |
-          curl --request GET '${{ secrets.COOLIFY_WEBHOOK }}' \
-            --header 'Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}'
+          curl -X 'POST' \
+          'https://dopkloy.andribraun.dev/api/application.deploy' \
+          -H 'accept: application/json' \
+          -H 'x-api-key: ${{ secrets.DOKPLOY_API_KEY }}' \
+          -H 'Content-Type: application/json' \
+          -d '{
+            "applicationId": "${{ secrets.DOKPLOY_APP_ID }}"
+          }'

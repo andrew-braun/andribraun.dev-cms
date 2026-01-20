@@ -69,6 +69,11 @@ RUN adduser --system --uid 1001 nextjs
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
+# Create data directory for persistent storage
+RUN mkdir -p /app/data && \
+    chown -R nextjs:nodejs /app/data && \
+    chmod -R 755 /app/data
+
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

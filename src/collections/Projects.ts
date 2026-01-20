@@ -12,13 +12,6 @@ export const Projects: CollectionConfig = {
       type: 'richText',
     },
     {
-      name: 'description_markdown',
-      type: 'code',
-      admin: {
-        language: 'markdown',
-      },
-    },
-    {
       name: 'metadata',
       type: 'group',
       fields: [

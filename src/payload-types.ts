@@ -187,7 +187,6 @@ export interface Project {
     };
     [k: string]: unknown;
   } | null;
-  description_markdown?: string | null;
   metadata?: {
     technologies?: (number | Technology)[] | null;
   };
@@ -358,7 +357,6 @@ export interface MediaSelect<T extends boolean = true> {
 export interface ProjectsSelect<T extends boolean = true> {
   title?: T;
   description?: T;
-  description_markdown?: T;
   metadata?:
     | T
     | {

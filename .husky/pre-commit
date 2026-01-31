@@ -1,0 +1,6 @@
+# Run linting and formatting
+pnpm exec lint-staged
+
+# Create migration file (CRITICAL - must run before every commit)
+echo "Creating Payload migration..."
+pnpm payload migrate:create

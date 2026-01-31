@@ -1,67 +1,146 @@
-# Payload Blank Template
+# Andri Braun Portfolio CMS
 
-This template comes configured with the bare minimum to get started on anything you need.
+A headless CMS built with [Payload CMS](https://payloadcms.com) v3 and Next.js for managing portfolio projects, technologies, and media.
 
-## Quick start
+## Overview
 
-This template can be deployed directly from our Cloud hosting and it will setup MongoDB and cloud S3 object storage for media.
+This CMS powers my portfolio website by managing projects, technologies, and media assets. It features an AI-powered technology extraction system that automatically identifies and catalogs technologies mentioned in project descriptions.
 
-## Quick Start - local setup
+## Key Features
 
-To spin up this template locally, follow these steps:
+### AI Technology Extraction
 
-### Clone
+The standout feature is intelligent technology extraction powered by Claude AI:
 
-After you click the `Deploy` button above, you'll want to have standalone copy of this repo on your machine. If you've already cloned this repo, skip to [Development](#development).
+- **Automatic Detection**: Analyzes project descriptions to identify technologies, frameworks, and tools
+- **Smart Cataloging**: Creates new technology entries automatically with proper categorization
+- **Relationship Management**: Links extracted technologies to projects seamlessly
+- **Data Validation**: Validates URLs, required fields, and categories before saving
+- **Error Reporting**: Provides detailed logging and user feedback for troubleshooting
 
-### Development
+Access it via the "Extract Technologies" button when editing any project in the admin panel.
 
-1. First [clone the repo](#clone) if you have not done so already
-2. `cd my-project && cp .env.example .env` to copy the example environment variables. You'll need to add the `MONGODB_URI` from your Cloud project to your `.env` if you want to use S3 storage and the MongoDB database that was created for you.
+### Collections Architecture
 
-3. `pnpm install && pnpm dev` to install dependencies and start the dev server
-4. open `http://localhost:3000` to open the app in your browser
+**Projects**: Portfolio projects with rich text descriptions, markdown support, and technology associations
 
-That's it! Changes made in `./src` will be reflected in your app. Follow the on-screen instructions to login and create your first admin user. Then check out [Production](#production) once you're ready to build and serve your app, and [Deployment](#deployment) when you're ready to go live.
+**Technologies**: Centralized database of technologies with:
 
-#### Docker (Optional)
+- Name, description, and official documentation links
+- Category classification (Frontend, Backend, Database, DevOps, etc.)
+- Automatic extraction from project descriptions
 
-If you prefer to use Docker for local development instead of a local MongoDB instance, the provided docker-compose.yml file can be used.
+**Tags**: Flexible tagging system for content organization
 
-To do so, follow these steps:
+**Media**: Image and asset management with Cloudflare R2 cloud storage
 
-- Modify the `MONGODB_URI` in your `.env` file to `mongodb://127.0.0.1/<dbname>`
-- Modify the `docker-compose.yml` file's `MONGODB_URI` to match the above `<dbname>`
-- Run `docker-compose up` to start the database, optionally pass `-d` to run in the background.
+**Users**: Authentication-enabled admin access control
 
-## How it works
+## Tech Stack
 
-The Payload config is tailored specifically to the needs of most websites. It is pre-configured in the following ways:
+- **CMS**: Payload CMS 3.69.0
+- **Framework**: Next.js 16.1.1 (App Router)
+- **Database**: PostgreSQL
+- **Storage**: Cloudflare R2 (S3-compatible)
+- **AI**: Claude (Anthropic)
+- **Testing**: Vitest, Playwright
+- **Language**: TypeScript
 
-### Collections
+## Architecture
 
-See the [Collections](https://payloadcms.com/docs/configuration/collections) docs for details on how to extend this functionality.
+Built on modern web technologies with type safety throughout:
 
-- #### Users (Authentication)
+- Server Actions for data mutations
+- Auto-generated TypeScript types from Payload collections
+- PostgreSQL migrations for schema management
+- Cloud-native storage with Cloudflare R2
+- AI integration for intelligent content processing
 
-  Users are auth-enabled collections that have access to the admin panel.
+## Development Workflow
 
-  For additional help, see the official [Auth Example](https://github.com/payloadcms/payload/tree/main/examples/auth) or the [Authentication](https://payloadcms.com/docs/authentication/overview#authentication-overview) docs.
+### Local Development
 
-- #### Media
+```bash
+# Install dependencies
+pnpm install
 
-  This is the uploads enabled collection. It features pre-configured sizes, focal point and manual resizing to help you manage your pictures.
+# Run development server
+pnpm dev
 
-### Docker
+# Access admin panel at http://localhost:3001/admin
+```
 
-Alternatively, you can use [Docker](https://www.docker.com) to spin up this template locally. To do so, follow these steps:
+### Database Migrations
 
-1. Follow [steps 1 and 2 from above](#development), the docker-compose file will automatically use the `.env` file in your project root
-1. Next run `docker-compose up`
-1. Follow [steps 4 and 5 from above](#development) to login and create your first admin user
+**⚠️ CRITICAL: Database migrations are essential to prevent database corruption.**
 
-That's it! The Docker instance will help you get up and running quickly while also standardizing the development environment across your teams.
+#### Migration Rules
 
-## Questions
+1. **NEVER run migrations in development** - The dev server should run against a stable database
+2. **ALWAYS create migrations before committing** - Schema changes must be tracked
+3. **Server automatically runs migrations on build** - Production deployment applies migrations
 
-If you have any issues or questions, reach out to us on [Discord](https://discord.com/invite/payload) or start a [GitHub discussion](https://github.com/payloadcms/payload/discussions).
+#### Creating Migrations
+
+When you make changes to Payload collections (schemas), you **MUST** create a migration:
+
+```bash
+pnpm payload migrate:create
+```
+
+This generates a migration file in `src/migrations/` that tracks your schema changes.
+
+#### Automated Pre-Commit Hook
+
+This project uses Husky to **automatically** run the following before every commit:
+
+- ✅ ESLint (with auto-fix)
+- ✅ Prettier formatting
+- ✅ Migration file creation (`payload migrate:create`)
+
+You don't need to remember to create migrations manually - the pre-commit hook handles it!
+
+#### What Happens on Deployment
+
+The build script (`pnpm build`) automatically runs `payload migrate` before building:
+
+```json
+"build": "payload migrate && next build"
+```
+
+This applies all pending migrations to your production database before deploying the new code.
+
+#### Manual Migration Commands
+
+```bash
+# Create a new migration (done automatically on commit)
+pnpm payload migrate:create
+
+# Apply pending migrations (done automatically on build)
+pnpm payload migrate
+
+# Check migration status
+pnpm payload migrate:status
+```
+
+**Reference**: [Payload CMS Migrations Documentation](https://payloadcms.com/docs/database/migrations)
+
+## Deployment
+
+### Pre-Deployment Checklist
+
+1. ✅ Make schema changes to collections
+2. ✅ Commit your changes (pre-commit hook creates migration automatically)
+3. ✅ Verify migration file was created in `src/migrations/`
+4. ✅ Push to repository
+5. ✅ Deploy (migrations run automatically during build)
+
+### Deployment Process
+
+The server automatically:
+
+1. Runs `payload migrate` to apply all pending migrations
+2. Builds the Next.js application
+3. Starts the production server
+
+**Never skip migrations** - they ensure your database schema matches your code.

@@ -3,31 +3,31 @@ const ANTHROPIC_VERSION = '2023-06-01'
 const DEFAULT_MODEL = 'claude-sonnet-4-5'
 
 export interface ClaudeMessage {
-  role: 'user' | 'assistant'
   content: string
+  role: 'assistant' | 'user'
 }
 
 export interface JsonSchema {
-  type: string
-  properties?: Record<string, JsonSchema | { type: string; items?: JsonSchema; enum?: string[] }>
-  items?: JsonSchema
-  required?: string[]
   additionalProperties?: boolean
-  enum?: string[]
   description?: string
+  enum?: string[]
+  items?: JsonSchema
+  properties?: Record<string, { enum?: string[]; items?: JsonSchema; type: string } | JsonSchema>
+  required?: string[]
+  type: string
 }
 
 export interface ClaudeRequestOptions {
-  model?: string
   maxTokens?: number
-  system?: string
+  model?: string
   outputSchema?: JsonSchema
+  system?: string
 }
 
 export interface ClaudeResponse {
   content: Array<{
-    type: 'text'
     text: string
+    type: 'text'
   }>
   model: string
   stop_reason: string
@@ -52,12 +52,12 @@ export async function sendMessage(
   messages: ClaudeMessage[],
   options: ClaudeRequestOptions = {},
 ): Promise<ClaudeResponse> {
-  const { model = DEFAULT_MODEL, maxTokens = 1024, system, outputSchema } = options
+  const { maxTokens = 1024, model = DEFAULT_MODEL, outputSchema, system } = options
 
   const body: Record<string, unknown> = {
-    model,
     max_tokens: maxTokens,
     messages,
+    model,
   }
 
   if (system) {
@@ -73,14 +73,19 @@ export async function sendMessage(
     }
   }
 
+  const apiKey = process.env.CLAUDE_API_KEY
+  if (!apiKey) {
+    throw new ClaudeAPIError('CLAUDE_API_KEY environment variable is not set')
+  }
+
   const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.CLAUDE_API_KEY!,
-      'anthropic-version': ANTHROPIC_VERSION,
-    },
     body: JSON.stringify(body),
+    headers: {
+      'anthropic-version': ANTHROPIC_VERSION,
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+    },
+    method: 'POST',
   })
 
   if (!response.ok) {
@@ -108,13 +113,16 @@ export function parseJsonFromResponse<T>(response: ClaudeResponse, fallback: T):
 
   try {
     return JSON.parse(cleanText)
-  } catch {
+  } catch (error) {
+    console.error('Failed to parse JSON from Claude response:', error)
+    console.error('Raw response text:', text)
     // Fallback: try to extract JSON from the response
     const jsonMatch = text.match(/\[[\s\S]*\]/) || text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[0])
-      } catch {
+      } catch (matchError) {
+        console.error('Failed to parse extracted JSON:', matchError)
         return fallback
       }
     }

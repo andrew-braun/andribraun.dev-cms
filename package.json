@@ -15,7 +15,17 @@
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start -p 3001",
     "test": "pnpm run test:int && pnpm run test:e2e",
     "test:e2e": "cross-env NODE_OPTIONS=\"--no-deprecation --no-experimental-strip-types\" pnpm exec playwright test",
-    "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts"
+    "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,scss}": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.971.0",
@@ -35,6 +45,7 @@
     "sharp": "0.34.5"
   },
   "devDependencies": {
+    "@payloadcms/eslint-config": "^3.28.0",
     "@playwright/test": "1.57.0",
     "@testing-library/react": "16.3.1",
     "@types/node": "^24.9.1",
@@ -43,8 +54,9 @@
     "@vitejs/plugin-react": "5.1.2",
     "baseline-browser-mapping": "^2.9.11",
     "eslint": "^9.39.2",
-    "eslint-config-next": "16.1.1",
+    "husky": "^9.1.7",
     "jsdom": "27.4.0",
+    "lint-staged": "^16.2.7",
     "playwright": "1.57.0",
     "playwright-core": "1.57.0",
     "prettier": "^3.7.4",

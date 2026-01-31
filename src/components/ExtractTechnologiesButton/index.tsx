@@ -1,11 +1,18 @@
 'use client'
 
-import { useDocumentInfo, Button, toast } from '@payloadcms/ui'
-import { useState } from 'react'
 import { extractTechnologies } from '@/actions/extractTechnologies'
+import { Button, toast, useDocumentInfo } from '@payloadcms/ui'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 
+/**
+ * Button component for extracting technologies from a project description using AI.
+ * Automatically creates new technology entries and links them to the current project.
+ * Requires the document to be saved before extraction can begin.
+ */
 const ExtractTechnologiesButton: React.FC = () => {
   const { id } = useDocumentInfo()
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
   const handleExtract = async () => {
@@ -23,13 +30,21 @@ const ExtractTechnologiesButton: React.FC = () => {
       }
 
       if (result.created.length > 0) {
-        toast.success(`Created ${result.created.length} new technologies: ${result.created.join(', ')}`)
+        toast.success(
+          `Created ${result.created.length} new technologies: ${result.created.join(', ')}`,
+        )
       } else {
         toast.info('No new technologies to create')
       }
 
+      if (result.errors && result.errors.length > 0) {
+        toast.warning(
+          `${result.errors.length} error(s) occurred: ${result.errors.slice(0, 3).join('; ')}${result.errors.length > 3 ? '...' : ''}`,
+        )
+      }
+
       if (result.linked > 0) {
-        window.location.reload()
+        router.refresh()
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Extraction failed')
@@ -38,15 +53,12 @@ const ExtractTechnologiesButton: React.FC = () => {
     }
   }
 
-  if (!id) return null
+  if (!id) {
+    return null
+  }
 
   return (
-    <Button
-      onClick={handleExtract}
-      disabled={isLoading}
-      buttonStyle="secondary"
-      size="small"
-    >
+    <Button buttonStyle="secondary" disabled={isLoading} onClick={handleExtract} size="small">
       {isLoading ? 'Extracting...' : 'Extract Technologies'}
     </Button>
   )

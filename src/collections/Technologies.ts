@@ -1,5 +1,19 @@
 import type { CollectionConfig } from 'payload'
 
+export const TECHNOLOGY_CATEGORIES = [
+  { label: 'Backend', value: 'backend' },
+  { label: 'CMS', value: 'cms' },
+  { label: 'Database', value: 'database' },
+  { label: 'Design', value: 'design' },
+  { label: 'DevOps', value: 'devops' },
+  { label: 'Framework', value: 'framework' },
+  { label: 'Frontend', value: 'frontend' },
+  { label: 'Language', value: 'language' },
+  { label: 'Tool', value: 'tool' },
+] as const
+
+export type TechnologyCategory = (typeof TECHNOLOGY_CATEGORIES)[number]['value']
+
 export const Technologies: CollectionConfig = {
   slug: 'technologies',
   admin: {
@@ -21,44 +35,7 @@ export const Technologies: CollectionConfig = {
     {
       name: 'category',
       type: 'select',
-      options: [
-        {
-          label: 'Backend',
-          value: 'backend',
-        },
-        {
-          label: 'CMS',
-          value: 'cms',
-        },
-        {
-          label: 'Database',
-          value: 'database',
-        },
-        {
-          label: 'Design',
-          value: 'design',
-        },
-        {
-          label: 'DevOps',
-          value: 'devops',
-        },
-        {
-          label: 'Framework',
-          value: 'framework',
-        },
-        {
-          label: 'Frontend',
-          value: 'frontend',
-        },
-        {
-          label: 'Language',
-          value: 'language',
-        },
-        {
-          label: 'Tool',
-          value: 'tool',
-        },
-      ],
+      options: [...TECHNOLOGY_CATEGORIES],
       hasMany: true,
     },
   ],

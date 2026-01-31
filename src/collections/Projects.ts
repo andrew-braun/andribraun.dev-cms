@@ -2,6 +2,13 @@ import type { CollectionConfig } from 'payload'
 
 export const Projects: CollectionConfig = {
   slug: 'projects',
+  admin: {
+    components: {
+      edit: {
+        beforeDocumentControls: [{ path: '@/components/ExtractTechnologiesButton' }],
+      },
+    },
+  },
   fields: [
     {
       name: 'title',

@@ -1,0 +1,1355 @@
+[
+  {
+    "id": 5,
+    "title": "WhereNext.ai",
+    "description_markdown": "# Client-side + General Project Architecture\r\n\r\nAn AI-powered travel planning platform that creates personalized, comprehensive travel guides for any destination in the world. Users describe their ideal trip — dates, budget, travel style, activities — and the platform generates a rich, interactive guide complete with maps, bookable experiences, weather forecasts, and even a language phrasebook that speaks to you. Think of it as having a knowledgeable travel friend who does all the research for you!\r\n\r\n## Tech Stack & Architecture\r\n\r\n- <span class=\"tech\" data-tag=\"next-js\">Next.js</span> 16 with the App Router and a hybrid rendering strategy — guide pages are statically generated with weekly ISR, while interactive features like maps and chat load client-side via dynamic imports.\r\n- <span class=\"tech\" data-tag=\"react\">React</span> 19 + <span class=\"tech\" data-tag=\"typescript\">TypeScript</span> strict mode for the entire frontend, with <span class=\"tech\" data-tag=\"mantine\">Mantine</span> 8 as the component library and <span class=\"tech\" data-tag=\"scss\">SCSS Modules</span> for component-scoped styling.\r\n- <span class=\"tech\" data-tag=\"openai\">OpenAI</span> Responses API powers both the guide generation pipeline and an in-guide AI chat assistant with real-time streaming responses.\r\n- <span class=\"tech\" data-tag=\"strapi\">Strapi</span> v5 headless CMS as the content backend, queried via <span class=\"tech\" data-tag=\"apollo-client\">Apollo Client</span> 4 (<span class=\"tech\" data-tag=\"graphql\">GraphQL</span>) for server-side data fetching.\r\n- <span class=\"tech\" data-tag=\"mapbox\">Mapbox GL</span> for interactive maps with automatic WebGL marker clustering for large datasets, plus <span class=\"tech\" data-tag=\"google-places\">Google Places</span> API for location autocomplete and POI data.\r\n- <span class=\"tech\" data-tag=\"algolia\">Algolia</span> for instant full-text search across all published guides with faceted filtering by country, budget, and travel style.\r\n- <span class=\"tech\" data-tag=\"azure-functions\">Azure Durable Functions</span> handle the heavy AI guide generation as an async queue-based pipeline, with <span class=\"tech\" data-tag=\"swr\">SWR</span>-powered polling on the client.\r\n- <span class=\"tech\" data-tag=\"clerk\">Clerk</span> for authentication (Google OAuth + email), <span class=\"tech\" data-tag=\"viator\">Viator</span> API for bookable travel experiences, <span class=\"tech\" data-tag=\"cloudinary\">Cloudinary</span> for image optimization, and <span class=\"tech\" data-tag=\"zod\">Zod</span> for runtime validation.\r\n- Deployed on <span class=\"tech\" data-tag=\"vercel\">Vercel</span> with cron jobs, monitored via <span class=\"tech\" data-tag=\"datadog\">Datadog</span> RUM, and tested with <span class=\"tech\" data-tag=\"jest\">Jest</span> + <span class=\"tech\" data-tag=\"react-testing-library\">React Testing Library</span> in <span class=\"tech\" data-tag=\"github-actions\">GitHub Actions</span> CI.\r\n\r\n## Key Implementation Details\r\n\r\n**Async Guide Generation Pipeline** — The core product workflow is a multi-stage asynchronous system. A 7-step wizard form collects trip preferences, then enqueues the job to an <span class=\"tech\" data-tag=\"azure-functions\">Azure Durable Function</span>. A custom <span class=\"tech\" data-tag=\"swr\">SWR</span>-based polling hook tracks progress through two stages (queue → function execution), persisting state to localStorage so users can navigate freely during the 2+ minute generation process and get notified anywhere on the site when their guide is ready.\r\n\r\n**Streaming AI Chat Assistant** — Each travel guide embeds a context-aware AI chat powered by <span class=\"tech\" data-tag=\"openai\">OpenAI</span>'s Responses API with streaming. The `useChat` hook manages conversation state and processes real-time responses via ReadableStream with custom TransformStream processing. The chat receives guide-specific context (location, itinerary, key facts) so answers are always relevant, and responses can automatically enrich the guide's FAQ section.\r\n\r\n**Adaptive Map Rendering** — The <span class=\"tech\" data-tag=\"mapbox\">Mapbox GL</span> integration automatically switches between DOM-based markers for small datasets and GPU-accelerated WebGL layers with GeoJSON clustering when there are 50+ markers. Map tiles load first with a 1-second marker delay, interactions are throttled, and all sub-components use dynamic imports with `ssr: false` to keep the initial bundle lean.\r\n\r\n**Language Phrasebook with Text-to-Speech** — A 500+ line component renders phrase cards for 26+ languages with native text, transliteration, and pronunciation guides. It integrates the Web Speech API with intelligent voice selection — each language has a fallback chain (e.g., looking for locale-specific voices before generic ones), handles concurrent speech management, and includes retry logic for browser-specific TTS quirks.\r\n\r\n**In-App Browser Detection & Auth Adaptation** — The authentication flow detects Instagram, Facebook, TikTok, Twitter, LinkedIn, Gmail, and Line in-app WebViews, adjusting the <span class=\"tech\" data-tag=\"clerk\">Clerk</span> auth strategy accordingly. Guests complete the entire wizard without authentication, with a gate only at the final submission step to minimize friction.\r\n\r\n**SEO & Instant Indexing Pipeline** — Every guide page generates rich metadata with Open Graph tags, <span class=\"tech\" data-tag=\"json-ld\">JSON-LD</span> structured data (`TravelGuide` schema), and breadcrumb markup. Newly generated guides are immediately submitted to search engines via IndexNow with deduplication and error recovery. A dynamic sitemap regenerates via <span class=\"tech\" data-tag=\"vercel\">Vercel</span> cron jobs twice daily.\r\n\r\n## Outcome\r\n\r\nA production travel platform that transforms a simple trip questionnaire into a rich, interactive travel guide — complete with AI chat, interactive maps, bookable experiences, weather data, and multilingual phrasebooks — all generated asynchronously and delivered as a fast, statically-rendered page. The architecture balances heavy AI workloads (offloaded to <span class=\"tech\" data-tag=\"azure-functions\">Azure</span>) with snappy user experience (static pages, streaming responses, WebGL maps), while the modular component structure and strict typing keep the codebase maintainable as the platform grows.\r\n\r\n\r\n# Server-side Guide Generation Pipeline\r\n\r\nThe serverless backend engine powering WhereNext.ai's travel guide generation — a pair of <span class=\"tech\" data-tag=\"azure-functions\">Azure Functions</span> apps that fully decouple the slow, expensive work of AI content generation from the user-facing web app. When a user submits their trip details, the queue manager accepts the request in milliseconds, hands it off to a durable orchestration pipeline via <span class=\"tech\" data-tag=\"azure-service-bus\">Azure Service Bus</span>, and a second function app spends the next two-plus minutes coordinating a dozen parallel AI calls before quietly notifying the frontend that the guide is ready.\r\n\r\n## Tech Stack & Architecture\r\n\r\n- <span class=\"tech\" data-tag=\"azure-functions\">Azure Functions</span> v4 with HTTP and Service Bus triggers, split across two function apps — a lightweight queue manager for ingestion and a heavier orchestration engine for generation.\r\n- <span class=\"tech\" data-tag=\"azure-durable-functions\">Azure Durable Functions</span> using the generator-based orchestrator pattern to coordinate multi-stage, long-running workflows with built-in state persistence and replay.\r\n- <span class=\"tech\" data-tag=\"azure-service-bus\">Azure Service Bus</span> as the message broker between the two apps, with separate queues per environment (`-local`, `-staging`, `-prod`).\r\n- <span class=\"tech\" data-tag=\"azure-sql\">Azure SQL</span> via <span class=\"tech\" data-tag=\"mssql\">mssql</span> for UUID-based request status tracking (`queued → running → completed/failed`), giving the client a simple polling target without WebSocket complexity.\r\n- <span class=\"tech\" data-tag=\"openai\">OpenAI</span> GPT-4.1 with function calling for structured content generation — key facts, itineraries, guide sections, FAQs, and multilingual phrase sets.\r\n- <span class=\"tech\" data-tag=\"strapi\">Strapi</span> v5 as the content backend, updated incrementally via REST as each activity completes, using dot-notation field paths to attach content to nested CMS components.\r\n- <span class=\"tech\" data-tag=\"midjourney\">Midjourney</span> for AI hero image generation with dynamically constructed prompts that factor in destination, travel season (computed from trip dates and latitude), and photographic style directives. Generated image URLs are cached in <span class=\"tech\" data-tag=\"azure-sql\">Azure SQL</span> so retries reuse existing images rather than triggering redundant generation jobs.\r\n- <span class=\"tech\" data-tag=\"hubspot\">HubSpot</span> for CRM deal creation on guide completion, and <span class=\"tech\" data-tag=\"brevo\">Brevo</span> for transactional email notifications and contact list management.\r\n- <span class=\"tech\" data-tag=\"typescript\">TypeScript</span> with strict typing throughout, <span class=\"tech\" data-tag=\"node-js\">Node.js</span> 22, and <span class=\"tech\" data-tag=\"azure-application-insights\">Application Insights</span> for production monitoring and correlated request tracing via propagated UUIDs.\r\n\r\n## Key Implementation Details\r\n\r\n**Two-App Architecture for Decoupled Ingestion** — The system is intentionally split into two separate function apps with a Service Bus queue between them. The queue manager's sole job is to validate the request, write a `queued` record to the database, and enqueue a message — it responds to the client in under a second. The orchestration engine is completely independent: it can be scaled, redeployed, or fail without affecting the ingestion surface. This also means the client never waits on a synchronous AI call; it gets a UUID and starts polling.\r\n\r\n**Durable Functions Fan-Out with Sub-Orchestrators** — The main orchestrator runs a sequential `setupGuide` step to create the guide shell in <span class=\"tech\" data-tag=\"strapi\">Strapi</span>, then fans out into up to 14 concurrent activities and sub-orchestrators using `context.df.Task.all()`. A `guideInfoSubOrchestrator` handles 7 guide sections in its own parallel fan-out, and an `imageSubOrchestrator` manages <span class=\"tech\" data-tag=\"midjourney\">Midjourney</span> image generation and attachment separately. Using sub-orchestrators keeps the main orchestrator's event history manageable and makes each concern independently retryable.\r\n\r\n**Service Bus Hold Pattern** — Normally, a Service Bus trigger completes (and unlocks the message) as soon as the function returns. Here, the trigger function deliberately holds execution — polling the orchestration status every 5 seconds, up to a 10-minute deadline — before returning. This prevents the broker from treating an in-flight orchestration as a failed delivery and requeuing it. The database status doubles as an idempotency guard: if the message fires twice, the trigger checks for `completed` and exits immediately rather than launching a duplicate run.\r\n\r\n**Multi-Layer Retry Resilience** — Three distinct retry layers handle different failure modes. <span class=\"tech\" data-tag=\"azure-durable-functions\">Durable Functions</span>' `RetryOptions` (5 s initial interval, 3 attempts) restarts any failed activity at the orchestration level. The `strapiFetch` utility adds an inner retry loop with linear backoff so transient <span class=\"tech\" data-tag=\"strapi\">Strapi</span> errors are absorbed before surfacing. For <span class=\"tech\" data-tag=\"openai\">OpenAI</span> itinerary generation specifically, a recursive retry runs up to 5 times if the returned day count doesn't match the trip duration, keeping the best attempt (longest valid itinerary) across runs rather than failing outright.\r\n\r\n**Structured Output Enforcement via Function Calling** — Rather than parsing free-form GPT responses, every content activity uses <span class=\"tech\" data-tag=\"openai\">OpenAI</span>'s function calling to enforce a strict JSON schema on the output. Each activity then runs its own validation pass — key facts checks all 12+ fields are populated and under 255 characters, useful phrases verifies all 8 required entries have native text, transliteration, and pronunciation — and retries the generation call if validation fails. This catches model hallucinations or truncated responses before they reach the CMS.\r\n\r\n**Lifecycle Completion with Graceful Degradation** — After all parallel tasks finish, a final `lifecycleCompleted` activity chains through guide publication in <span class=\"tech\" data-tag=\"strapi\">Strapi</span>, a <span class=\"tech\" data-tag=\"hubspot\">HubSpot</span> deal creation (mapping guide metadata to deal properties for the sales pipeline), adding the user to a <span class=\"tech\" data-tag=\"brevo\">Brevo</span> contact list, and triggering a transactional completion email via <span class=\"tech\" data-tag=\"brevo\">Brevo</span> to notify the user their guide is ready. Each step is wrapped in independent error handling — a CRM failure doesn't block publication, and an email failure doesn't block the CRM. The user gets their guide regardless of what downstream integrations do.\r\n\r\n## Outcome\r\n\r\nA production-grade serverless pipeline that turns a 2+ minute AI generation job into a non-blocking background process, giving users a UUID to poll against while they navigate freely. The combination of <span class=\"tech\" data-tag=\"azure-durable-functions\">Durable Functions</span> state persistence, multi-layer retries, and Service Bus delivery guarantees means no request is silently dropped and any transient failure — whether from <span class=\"tech\" data-tag=\"openai\">OpenAI</span>, <span class=\"tech\" data-tag=\"strapi\">Strapi</span>, or <span class=\"tech\" data-tag=\"midjourney\">Midjourney</span> — is handled without user-visible errors.\r\n",
+    "metadata": {
+      "technologies": [
+        {
+          "id": 21,
+          "name": "Next.js",
+          "description": "Next.js is a React framework that enables functionality such as server-side rendering, static site generation, API routes, and file-based routing for building full-stack web applications.",
+          "link": "https://nextjs.org",
+          "category": ["framework", "frontend"],
+          "updatedAt": "2026-02-10T15:00:21.136Z",
+          "createdAt": "2026-02-10T15:00:21.136Z"
+        },
+        {
+          "id": 30,
+          "name": "React",
+          "description": "React is a JavaScript library for building user interfaces developed by Meta that uses a component-based architecture and virtual DOM for efficient rendering of interactive web applications.",
+          "link": "https://react.dev",
+          "category": ["frontend", "framework"],
+          "updatedAt": "2026-02-10T15:00:21.199Z",
+          "createdAt": "2026-02-10T15:00:21.199Z"
+        },
+        {
+          "id": 5,
+          "name": "TypeScript",
+          "description": "TypeScript is a strongly typed programming language that builds on JavaScript by adding optional static type definitions, enabling better tooling, error detection at compile-time, and improved code maintainability for large-scale applications.",
+          "link": "https://www.typescriptlang.org",
+          "category": ["language"],
+          "updatedAt": "2026-01-31T06:21:49.525Z",
+          "createdAt": "2026-01-31T06:21:49.525Z"
+        },
+        {
+          "id": 7,
+          "name": "SCSS",
+          "description": "SCSS (Sassy CSS) is a CSS preprocessor and syntax of Sass that extends CSS with features like variables, nested rules, mixins, and functions, making stylesheets more maintainable and powerful while remaining fully compatible with CSS syntax.",
+          "link": "https://sass-lang.com",
+          "category": ["language", "frontend", "design"],
+          "updatedAt": "2026-01-31T06:21:49.545Z",
+          "createdAt": "2026-01-31T06:21:49.545Z"
+        },
+        {
+          "id": 38,
+          "name": "Strapi",
+          "description": "Strapi is an open-source headless CMS built with Node.js that allows developers to build flexible and customizable content APIs quickly. It provides a powerful admin panel, RESTful and GraphQL APIs out of the box, and supports multiple databases.",
+          "link": "https://strapi.io/",
+          "category": ["cms", "backend"],
+          "updatedAt": "2026-02-10T15:32:02.061Z",
+          "createdAt": "2026-02-10T15:32:02.061Z"
+        },
+        {
+          "id": 37,
+          "name": "Apollo Client",
+          "description": "Apollo Client is a comprehensive state management library for JavaScript that enables you to manage both local and remote data with GraphQL. It provides intelligent caching, declarative data fetching, and seamless integration with modern frontend frameworks like React.",
+          "link": "https://www.apollographql.com/docs/react/",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.052Z",
+          "createdAt": "2026-02-10T15:32:02.052Z"
+        },
+        {
+          "id": 9,
+          "name": "GraphQL",
+          "description": "GraphQL is a query language and runtime for APIs that enables clients to request exactly the data they need in a single request, providing a more efficient, powerful, and flexible alternative to REST APIs.",
+          "link": "https://graphql.org",
+          "category": ["backend", "language"],
+          "updatedAt": "2026-01-31T06:21:49.562Z",
+          "createdAt": "2026-01-31T06:21:49.562Z"
+        },
+        {
+          "id": 42,
+          "name": "Algolia",
+          "description": "Algolia is a hosted search engine API that delivers fast, relevant search experiences with features like typo-tolerance, filtering, and ranking customization. It provides millisecond-level search responses and powers search and discovery for websites and mobile applications.",
+          "link": "https://www.algolia.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.082Z",
+          "createdAt": "2026-02-10T15:32:02.082Z"
+        },
+        {
+          "id": 39,
+          "name": "SWR",
+          "description": "SWR is a React Hooks library for data fetching developed by Vercel that implements the stale-while-revalidate HTTP cache invalidation strategy. It provides features like automatic revalidation, focus tracking, request deduplication, and optimistic UI updates.",
+          "link": "https://swr.vercel.app/",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.068Z",
+          "createdAt": "2026-02-10T15:32:02.068Z"
+        },
+        {
+          "id": 40,
+          "name": "Clerk",
+          "description": "Clerk is a complete user management platform that provides authentication, user profile management, and session handling with pre-built UI components. It offers features like social login, multi-factor authentication, and organization management with minimal code implementation.",
+          "link": "https://clerk.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.074Z",
+          "createdAt": "2026-02-10T15:32:02.074Z"
+        },
+        {
+          "id": 59,
+          "name": "Cloudinary",
+          "description": "Cloudinary is a cloud-based media management platform that provides end-to-end image and video management including upload, storage, optimization, transformation, and delivery via CDN. It offers automatic format conversion, responsive image delivery, and AI-powered content analysis.",
+          "link": "https://cloudinary.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.145Z",
+          "createdAt": "2026-02-10T15:32:02.145Z"
+        },
+        {
+          "id": 6,
+          "name": "Zod",
+          "description": "Zod is a TypeScript-first schema validation library with static type inference, allowing developers to define schemas that automatically generate TypeScript types while providing runtime validation for data structures.",
+          "link": "https://zod.dev",
+          "category": ["tool", "language"],
+          "updatedAt": "2026-01-31T06:21:49.535Z",
+          "createdAt": "2026-01-31T06:21:49.535Z"
+        },
+        {
+          "id": 56,
+          "name": "Vercel",
+          "description": "Vercel is a cloud platform for static sites and serverless functions that enables developers to deploy web applications with zero configuration. It provides automatic deployments, edge network distribution, serverless functions, and seamless integration with frontend frameworks like Next.js.",
+          "link": "https://vercel.com/",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.133Z",
+          "createdAt": "2026-02-10T15:32:02.133Z"
+        },
+        {
+          "id": 53,
+          "name": "Datadog",
+          "description": "Datadog is a monitoring and analytics platform for cloud-scale applications that provides infrastructure monitoring, application performance monitoring (APM), and log management. It offers real-time visibility into system health, performance metrics, and distributed tracing across the entire technology stack.",
+          "link": "https://www.datadoghq.com/",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.123Z",
+          "createdAt": "2026-02-10T15:32:02.122Z"
+        },
+        {
+          "id": 49,
+          "name": "HubSpot",
+          "description": "HubSpot is a CRM platform that provides marketing, sales, and customer service software with APIs for integration into custom applications. It offers tools for lead management, email marketing, analytics, and customer relationship tracking.",
+          "link": "https://www.hubspot.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.107Z",
+          "createdAt": "2026-02-10T15:32:02.107Z"
+        },
+        {
+          "id": 29,
+          "name": "Node.js",
+          "description": "Node.js is a JavaScript runtime built on Chrome's V8 engine that allows developers to run JavaScript on the server-side, enabling scalable network applications with non-blocking I/O.",
+          "link": "https://nodejs.org",
+          "category": ["backend", "language"],
+          "updatedAt": "2026-02-10T15:00:21.193Z",
+          "createdAt": "2026-02-10T15:00:21.193Z"
+        },
+        {
+          "id": 69,
+          "name": "Mantine",
+          "description": "Mantine is a fully featured React components library that provides a comprehensive collection of customizable UI components, hooks, and utilities for building modern web applications with a focus on developer experience and accessibility.",
+          "link": "https://mantine.dev/",
+          "category": ["frontend", "framework"],
+          "updatedAt": "2026-02-21T06:38:08.132Z",
+          "createdAt": "2026-02-21T06:38:08.132Z"
+        },
+        {
+          "id": 70,
+          "name": "OpenAI",
+          "description": "OpenAI is an artificial intelligence research company that provides API access to advanced AI models including GPT-4, DALL-E, and Whisper for natural language processing, image generation, and speech recognition capabilities.",
+          "link": "https://openai.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-21T06:38:08.140Z",
+          "createdAt": "2026-02-21T06:38:08.140Z"
+        },
+        {
+          "id": 71,
+          "name": "Mapbox",
+          "description": "Mapbox is a location data platform that provides customizable maps, geocoding, navigation, and spatial analysis tools through APIs and SDKs for building location-based applications and visualizations.",
+          "link": "https://www.mapbox.com/",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-21T06:38:08.146Z",
+          "createdAt": "2026-02-21T06:38:08.146Z"
+        },
+        {
+          "id": 72,
+          "name": "Google Places",
+          "description": "Google Places API is a service that returns information about places using HTTP requests, including establishment data, geographic locations, and place details for integration into applications requiring location-based functionality.",
+          "link": "https://developers.google.com/maps/documentation/places/web-service",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-21T06:38:08.154Z",
+          "createdAt": "2026-02-21T06:38:08.154Z"
+        },
+        {
+          "id": 73,
+          "name": "Azure Functions",
+          "description": "Azure Functions is a serverless compute service that enables developers to run event-driven code without managing infrastructure, automatically scaling based on demand and supporting multiple programming languages.",
+          "link": "https://azure.microsoft.com/en-us/products/functions",
+          "category": ["backend", "devops"],
+          "updatedAt": "2026-02-21T06:38:08.160Z",
+          "createdAt": "2026-02-21T06:38:08.160Z"
+        },
+        {
+          "id": 74,
+          "name": "Azure Durable Functions",
+          "description": "Azure Durable Functions is an extension of Azure Functions that enables writing stateful workflows in a serverless environment, allowing for orchestration of long-running processes with built-in checkpointing and automatic restarts.",
+          "link": "https://learn.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-overview",
+          "category": ["backend", "devops"],
+          "updatedAt": "2026-02-21T06:38:08.167Z",
+          "createdAt": "2026-02-21T06:38:08.167Z"
+        },
+        {
+          "id": 75,
+          "name": "Viator",
+          "description": "Viator is a travel experiences platform and API that provides access to tours, activities, and attractions worldwide, enabling developers to integrate bookable travel experiences into their applications.",
+          "link": "https://www.viator.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-21T06:38:08.172Z",
+          "createdAt": "2026-02-21T06:38:08.172Z"
+        },
+        {
+          "id": 76,
+          "name": "Jest",
+          "description": "Jest is a comprehensive JavaScript testing framework developed by Meta that provides a complete testing solution with built-in test runner, assertion library, mocking capabilities, and code coverage reporting for JavaScript and TypeScript projects.",
+          "link": "https://jestjs.io/",
+          "category": ["tool"],
+          "updatedAt": "2026-02-21T06:38:08.178Z",
+          "createdAt": "2026-02-21T06:38:08.178Z"
+        },
+        {
+          "id": 77,
+          "name": "React Testing Library",
+          "description": "React Testing Library is a lightweight testing utility for React that encourages testing components from the user's perspective by focusing on how components are used rather than implementation details, promoting better testing practices.",
+          "link": "https://testing-library.com/react",
+          "category": ["tool", "frontend"],
+          "updatedAt": "2026-02-21T06:38:08.182Z",
+          "createdAt": "2026-02-21T06:38:08.182Z"
+        },
+        {
+          "id": 78,
+          "name": "GitHub Actions",
+          "description": "GitHub Actions is a CI/CD platform that automates software workflows directly in GitHub repositories, enabling developers to build, test, and deploy code with custom workflows triggered by repository events.",
+          "link": "https://github.com/features/actions",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-21T06:38:08.187Z",
+          "createdAt": "2026-02-21T06:38:08.187Z"
+        },
+        {
+          "id": 79,
+          "name": "JSON-LD",
+          "description": "JSON-LD (JavaScript Object Notation for Linked Data) is a lightweight syntax for encoding linked data using JSON, commonly used for structured data markup to improve search engine optimization and enable semantic web applications.",
+          "link": "https://json-ld.org/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-21T06:38:08.189Z",
+          "createdAt": "2026-02-21T06:38:08.189Z"
+        },
+        {
+          "id": 80,
+          "name": "Azure Service Bus",
+          "description": "Azure Service Bus is a fully managed enterprise message broker service that enables reliable cloud messaging between applications and services through queues and publish-subscribe topics, supporting decoupled architectures and asynchronous communication patterns.",
+          "link": "https://azure.microsoft.com/en-us/products/service-bus",
+          "category": ["backend", "devops"],
+          "updatedAt": "2026-02-21T06:38:08.192Z",
+          "createdAt": "2026-02-21T06:38:08.192Z"
+        },
+        {
+          "id": 81,
+          "name": "Azure SQL",
+          "description": "Azure SQL is a family of managed, secure, and intelligent SQL database services built on the SQL Server engine, offering always-up-to-date cloud database solutions with built-in high availability, scaling, and advanced security features.",
+          "link": "https://azure.microsoft.com/en-us/products/azure-sql",
+          "category": ["database", "backend"],
+          "updatedAt": "2026-02-21T06:38:08.198Z",
+          "createdAt": "2026-02-21T06:38:08.198Z"
+        },
+        {
+          "id": 82,
+          "name": "SQL Server",
+          "description": "Microsoft SQL Server is a relational database management system that provides comprehensive data management and business intelligence capabilities, supporting transaction processing, analytics, and data warehousing for enterprise applications.",
+          "link": "https://www.microsoft.com/en-us/sql-server",
+          "category": ["database", "backend"],
+          "updatedAt": "2026-02-21T06:38:08.203Z",
+          "createdAt": "2026-02-21T06:38:08.203Z"
+        },
+        {
+          "id": 83,
+          "name": "Midjourney",
+          "description": "Midjourney is an AI-powered image generation tool that creates high-quality artwork and graphics from text descriptions, widely used by designers and creators for concept art, illustrations, and visual content creation.",
+          "link": "https://www.midjourney.com/",
+          "category": ["design", "tool"],
+          "updatedAt": "2026-02-21T06:38:08.207Z",
+          "createdAt": "2026-02-21T06:38:08.207Z"
+        },
+        {
+          "id": 84,
+          "name": "Brevo",
+          "description": "Brevo (formerly Sendinblue) is a comprehensive digital marketing platform that provides email marketing, SMS messaging, marketing automation, and CRM tools for businesses to manage customer communications and campaigns.",
+          "link": "https://www.brevo.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-21T06:38:08.211Z",
+          "createdAt": "2026-02-21T06:38:08.211Z"
+        },
+        {
+          "id": 85,
+          "name": "Azure Application Insights",
+          "description": "Azure Application Insights is an application performance management service that provides real-time monitoring, diagnostics, and analytics for web applications, enabling developers to detect and diagnose issues, track usage, and optimize performance.",
+          "link": "https://azure.microsoft.com/en-us/products/monitor",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-21T06:38:08.213Z",
+          "createdAt": "2026-02-21T06:38:08.213Z"
+        }
+      ]
+    },
+    "liveLink": "https://wherenext.ai",
+    "thumbnail": null,
+    "images": [
+      {
+        "id": 14,
+        "alt": "WhereNext.ai ‘Create Travel Guide’ screen showing a destination search field with ‘Tbilisi’ entered and autocomplete suggestions for locations in Georgia.",
+        "updatedAt": "2026-02-21T06:20:27.662Z",
+        "createdAt": "2026-02-21T06:20:27.662Z",
+        "url": "/api/media/file/WhereNext.ai%20-%20Guide%20Creation%20Step%201",
+        "thumbnailURL": null,
+        "filename": "WhereNext.ai - Guide Creation Step 1",
+        "mimeType": "image/png",
+        "filesize": 3417126,
+        "width": 2560,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 15,
+        "alt": "WhereNext.ai guide generation screen prompting users to sign in, featuring ‘Continue with Google’ and ‘Continue with Email’ buttons and a completed multi-step progress indicator.",
+        "updatedAt": "2026-02-21T06:20:29.061Z",
+        "createdAt": "2026-02-21T06:20:29.061Z",
+        "url": "/api/media/file/WhereNext.ai%20-%20Guide%20Creation%20Final%20Step",
+        "thumbnailURL": null,
+        "filename": "WhereNext.ai - Guide Creation Final Step",
+        "mimeType": "image/png",
+        "filesize": 2611194,
+        "width": 2560,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 16,
+        "alt": "Kuala Lumpur travel guide page with a panoramic city skyline hero image, destination details, and navigation tabs including introduction, itinerary, attractions, and FAQ.",
+        "updatedAt": "2026-02-21T06:20:30.737Z",
+        "createdAt": "2026-02-21T06:20:30.737Z",
+        "url": "/api/media/file/WhereNext.ai%20-%20Guide%20Hero",
+        "thumbnailURL": null,
+        "filename": "WhereNext.ai - Guide Hero",
+        "mimeType": "image/png",
+        "filesize": 3145002,
+        "width": 2560,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 17,
+        "alt": "Itinerary tab of a Kuala Lumpur travel guide showing Day 1 plans with activity cards, location links, descriptions, and a featured day trip card with pricing and reviews.",
+        "updatedAt": "2026-02-21T06:20:31.322Z",
+        "createdAt": "2026-02-21T06:20:31.322Z",
+        "url": "/api/media/file/WhereNext.ai%20-%20Guide%20Itinerary",
+        "thumbnailURL": null,
+        "filename": "WhereNext.ai - Guide Itinerary",
+        "mimeType": "image/png",
+        "filesize": 740669,
+        "width": 2560,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 18,
+        "alt": "WhereNext.ai homepage hero section with a large island landscape background, headline about creating personalized travel guides, and primary ‘Create Guide’ and ‘View Guides’ buttons.",
+        "updatedAt": "2026-02-21T06:20:32.531Z",
+        "createdAt": "2026-02-21T06:20:32.531Z",
+        "url": "/api/media/file/WhereNext.ai%20-%20Site%20Hero",
+        "thumbnailURL": null,
+        "filename": "WhereNext.ai - Site Hero",
+        "mimeType": "image/png",
+        "filesize": 2545937,
+        "width": 2560,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      }
+    ],
+    "updatedAt": "2026-02-21T06:38:08.221Z",
+    "createdAt": "2026-02-21T06:37:38.896Z"
+  },
+  {
+    "id": 4,
+    "title": "Integration with Payday (Shopify App)",
+    "description_markdown": "A Shopify integration app that automatically syncs e-commerce orders and products with Payday, an invoicing platform. When merchants receive orders in their Shopify store, the app handles everything from customer creation to invoice generation behind the scenes — bridging two systems so merchants don't have to manually duplicate their work.\r\n\r\n## Tech Stack & Architecture\r\n\r\n- <span class=\"tech\" data-tag=\"express\">Express.js</span> + <span class=\"tech\" data-tag=\"next-js\">Next.js</span> hybrid server — <span class=\"tech\" data-tag=\"express\">Express</span> handles all API routes, webhooks, and business logic while <span class=\"tech\" data-tag=\"next-js\">Next.js</span> powers the frontend via request forwarding. This non-embedded architecture runs the app in its own window rather than inside the Shopify admin iframe.\r\n- <span class=\"tech\" data-tag=\"react\">React</span> frontend with <span class=\"tech\" data-tag=\"shopify-polaris\">Shopify Polaris</span> component library for a native Shopify look-and-feel, covering dashboards, order management, product mapping, settings, and pricing pages.\r\n- <span class=\"tech\" data-tag=\"mssql\">Microsoft SQL Server</span> for persistence (order queues, store configs, event logs) with <span class=\"tech\" data-tag=\"redis\">Redis</span> for Shopify OAuth session storage via `@shopify/shopify-app-session-storage`.\r\n- <span class=\"tech\" data-tag=\"graphql\">GraphQL</span> for all Shopify API communication using the `@shopify/shopify-api` SDK, with a composable fragment architecture for query construction.\r\n- <span class=\"tech\" data-tag=\"typescript\">TypeScript</span> across the full stack with path aliases, <span class=\"tech\" data-tag=\"zod\">Zod</span> for runtime validation, and <span class=\"tech\" data-tag=\"node-js\">Node.js</span> 22.\r\n- Containerized with <span class=\"tech\" data-tag=\"docker\">Docker</span> on Debian Bookworm, CI/CD through <span class=\"tech\" data-tag=\"azure-pipelines\">Azure Pipelines</span>.\r\n\r\n## Key Implementation Details\r\n\r\n**Shopify OAuth & Tiered Billing Integration** — Full Shopify OAuth offline flow with automatic webhook registration upon successful billing. The app supports multiple recurring billing plans with configurable trial periods, and verifies active payment status before enabling core features — including special handling for Shopify partner development stores.\r\n\r\n**Queue-Based Order Processing Pipeline** — Orders flow through a durable processing pipeline: Shopify webhooks enqueue orders into an <span class=\"tech\" data-tag=\"mssql\">MSSQL</span>-backed queue, which an in-memory scheduler processes via <span class=\"tech\" data-tag=\"cron\">cron jobs</span> every minute. The system includes exponential backoff on failures, duplicate detection via payload comparison, and automatic retry logic — ensuring no order is lost even during downstream API outages.\r\n\r\n**Bulk Sync System** — A multi-step sync interface lets merchants bulk-sync historical orders by date range, financial status, and fulfillment status, with inventory update options and a confirmation step before processing. Products get a parallel sync flow with SKU validation, inventory level lookups, and a detailed results modal reporting created, updated, and unsuccessful items with direct links back to the Shopify admin.\r\n\r\n**Product Mapping with Inventory Tracking** — Beyond orders, the app maintains a two-way product data bridge between Shopify and Payday. Product variants are synced with SKU validation, inventory levels are queried across locations, and the results are reported granularly — giving merchants visibility into exactly which products synced, which failed, and why.\r\n\r\n**API-Isolated Data Transformation Layer** — Internal <span class=\"tech\" data-tag=\"typescript\">TypeScript</span> types are deliberately decoupled from Shopify's <span class=\"tech\" data-tag=\"graphql\">GraphQL</span> schema, with a dedicated transformer that converts nested API responses into flat internal structures. When Shopify releases breaking API changes, updates are confined to a single transformer file rather than rippling across the codebase.\r\n\r\n**Composable <span class=\"tech\" data-tag=\"graphql\">GraphQL</span> Fragment Architecture** — Instead of monolithic queries, Shopify data fetching is built from 12+ reusable fragments (addresses, customers, line items, transactions, refunds, shipping lines, etc.) that compose into full order queries. This keeps queries maintainable and consistent as the Shopify API evolves across versions.\r\n\r\n**Multi-Domain Webhook System** — Separate webhook processors handle orders, customers, shops, and app lifecycle events, each with mandatory HMAC verification middleware. The system processes paid, fulfilled, refunded, returned, and manual order states, with specialized handlers for exchanges and async refunds.\r\n\r\n## Outcome\r\n\r\nA reliable integration that automates the entire order-to-invoice and product sync workflow for Shopify merchants using Payday, eliminating manual data entry and reducing invoicing errors. The queue-based architecture ensures fault tolerance during API disruptions, while the isolated transformation layer and composable fragment system make it straightforward to adapt as Shopify's API evolves across versions.\r\n",
+    "metadata": {
+      "technologies": [
+        {
+          "id": 21,
+          "name": "Next.js",
+          "description": "Next.js is a React framework that enables functionality such as server-side rendering, static site generation, API routes, and file-based routing for building full-stack web applications.",
+          "link": "https://nextjs.org",
+          "category": ["framework", "frontend"],
+          "updatedAt": "2026-02-10T15:00:21.136Z",
+          "createdAt": "2026-02-10T15:00:21.136Z"
+        },
+        {
+          "id": 30,
+          "name": "React",
+          "description": "React is a JavaScript library for building user interfaces developed by Meta that uses a component-based architecture and virtual DOM for efficient rendering of interactive web applications.",
+          "link": "https://react.dev",
+          "category": ["frontend", "framework"],
+          "updatedAt": "2026-02-10T15:00:21.199Z",
+          "createdAt": "2026-02-10T15:00:21.199Z"
+        },
+        {
+          "id": 9,
+          "name": "GraphQL",
+          "description": "GraphQL is a query language and runtime for APIs that enables clients to request exactly the data they need in a single request, providing a more efficient, powerful, and flexible alternative to REST APIs.",
+          "link": "https://graphql.org",
+          "category": ["backend", "language"],
+          "updatedAt": "2026-01-31T06:21:49.562Z",
+          "createdAt": "2026-01-31T06:21:49.562Z"
+        },
+        {
+          "id": 5,
+          "name": "TypeScript",
+          "description": "TypeScript is a strongly typed programming language that builds on JavaScript by adding optional static type definitions, enabling better tooling, error detection at compile-time, and improved code maintainability for large-scale applications.",
+          "link": "https://www.typescriptlang.org",
+          "category": ["language"],
+          "updatedAt": "2026-01-31T06:21:49.525Z",
+          "createdAt": "2026-01-31T06:21:49.525Z"
+        },
+        {
+          "id": 6,
+          "name": "Zod",
+          "description": "Zod is a TypeScript-first schema validation library with static type inference, allowing developers to define schemas that automatically generate TypeScript types while providing runtime validation for data structures.",
+          "link": "https://zod.dev",
+          "category": ["tool", "language"],
+          "updatedAt": "2026-01-31T06:21:49.535Z",
+          "createdAt": "2026-01-31T06:21:49.535Z"
+        },
+        {
+          "id": 29,
+          "name": "Node.js",
+          "description": "Node.js is a JavaScript runtime built on Chrome's V8 engine that allows developers to run JavaScript on the server-side, enabling scalable network applications with non-blocking I/O.",
+          "link": "https://nodejs.org",
+          "category": ["backend", "language"],
+          "updatedAt": "2026-02-10T15:00:21.193Z",
+          "createdAt": "2026-02-10T15:00:21.193Z"
+        },
+        {
+          "id": 28,
+          "name": "Docker",
+          "description": "Docker is a platform that uses containerization technology to package applications and their dependencies into standardized units called containers, enabling consistent deployment across different environments.",
+          "link": "https://www.docker.com",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-10T15:00:21.186Z",
+          "createdAt": "2026-02-10T15:00:21.186Z"
+        },
+        {
+          "id": 61,
+          "name": "Express.js",
+          "description": "Express.js is a minimal and flexible Node.js web application framework that provides a robust set of features for building web and mobile applications and APIs. It simplifies server-side development with its middleware architecture and routing capabilities.",
+          "link": "https://expressjs.com/",
+          "category": ["backend", "framework"],
+          "updatedAt": "2026-02-17T15:07:20.133Z",
+          "createdAt": "2026-02-17T15:07:20.133Z"
+        },
+        {
+          "id": 62,
+          "name": "Shopify Polaris",
+          "description": "Shopify Polaris is a comprehensive design system and React component library that provides the building blocks for creating consistent, accessible experiences across Shopify's admin interface. It includes components, patterns, guidelines, and design resources for building Shopify apps.",
+          "link": "https://polaris.shopify.com/",
+          "category": ["frontend", "framework", "design"],
+          "updatedAt": "2026-02-17T15:07:20.146Z",
+          "createdAt": "2026-02-17T15:07:20.146Z"
+        },
+        {
+          "id": 63,
+          "name": "Microsoft SQL Server",
+          "description": "Microsoft SQL Server is a relational database management system (RDBMS) developed by Microsoft that supports transaction processing, business intelligence, and analytics applications. It provides enterprise-grade features including high availability, security, and performance optimization for storing and retrieving data.",
+          "link": "https://www.microsoft.com/en-us/sql-server/",
+          "category": ["database"],
+          "updatedAt": "2026-02-17T15:07:20.155Z",
+          "createdAt": "2026-02-17T15:07:20.155Z"
+        },
+        {
+          "id": 64,
+          "name": "Redis",
+          "description": "Redis is an open-source, in-memory data structure store that functions as a database, cache, message broker, and streaming engine. It supports various data structures like strings, hashes, lists, sets, and sorted sets, offering exceptional performance for real-time applications.",
+          "link": "https://redis.io/",
+          "category": ["database"],
+          "updatedAt": "2026-02-17T15:07:20.164Z",
+          "createdAt": "2026-02-17T15:07:20.164Z"
+        },
+        {
+          "id": 65,
+          "name": "Azure Pipelines",
+          "description": "Azure Pipelines is a cloud-based continuous integration and continuous delivery (CI/CD) service that automatically builds, tests, and deploys code to any platform or cloud. It supports multiple languages, platforms, and cloud providers with robust automation capabilities.",
+          "link": "https://azure.microsoft.com/en-us/products/devops/pipelines/",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-17T15:07:20.172Z",
+          "createdAt": "2026-02-17T15:07:20.172Z"
+        },
+        {
+          "id": 66,
+          "name": "Shopify",
+          "description": "Shopify is a complete commerce platform that enables businesses to start, grow, and manage online stores and retail point-of-sale systems. It provides hosting, payment processing, inventory management, and customizable storefronts without requiring extensive technical knowledge.",
+          "link": "https://www.shopify.com/",
+          "category": ["cms"],
+          "updatedAt": "2026-02-17T15:07:20.180Z",
+          "createdAt": "2026-02-17T15:07:20.180Z"
+        },
+        {
+          "id": 67,
+          "name": "Payday",
+          "description": "Payday is a Ruby library for generating PDF invoices and receipts programmatically with a simple DSL. It allows developers to create professional-looking financial documents with line items, taxes, and custom styling.",
+          "link": "https://github.com/commondream/payday",
+          "category": ["framework"],
+          "updatedAt": "2026-02-17T15:07:20.188Z",
+          "createdAt": "2026-02-17T15:07:20.188Z"
+        },
+        {
+          "id": 68,
+          "name": "Debian",
+          "description": "Debian is a free and open-source Linux distribution known for its stability, security, and extensive package management system. It serves as the foundation for many other distributions and is widely used for servers, desktops, and embedded systems.",
+          "link": "https://www.debian.org/",
+          "category": ["devops"],
+          "updatedAt": "2026-02-17T15:07:20.197Z",
+          "createdAt": "2026-02-17T15:07:20.197Z"
+        }
+      ]
+    },
+    "liveLink": "https://apps.shopify.com/payday-public-app",
+    "thumbnail": null,
+    "images": [
+      {
+        "id": 10,
+        "alt": "Shopify App Store listing for the Payday invoicing app, showing app name, rating, pricing details, screenshots, and installation button within the Shopify marketplace interface.",
+        "updatedAt": "2026-02-17T15:06:49.225Z",
+        "createdAt": "2026-02-17T15:06:49.225Z",
+        "url": "/api/media/file/Payday%20-%20Shopify%20App%20Store%20Screen",
+        "thumbnailURL": null,
+        "filename": "Payday - Shopify App Store Screen",
+        "mimeType": "image/png",
+        "filesize": 600397,
+        "width": 2560,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 11,
+        "alt": "Payday app connection screen prompting users to connect their Shopify store, featuring setup instructions and authentication fields within a clean dashboard interface.",
+        "updatedAt": "2026-02-17T15:06:49.644Z",
+        "createdAt": "2026-02-17T15:06:49.644Z",
+        "url": "/api/media/file/Payday%20-%20Connection%20Screen",
+        "thumbnailURL": null,
+        "filename": "Payday - Connection Screen",
+        "mimeType": "image/png",
+        "filesize": 382937,
+        "width": 2560,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 12,
+        "alt": "Payday app dashboard displaying options to sync Shopify orders by date, with order details, statuses, and invoice generation indicators in a structured admin table layout behind a modal screen displaying sync actions",
+        "updatedAt": "2026-02-17T15:06:50.061Z",
+        "createdAt": "2026-02-17T15:06:50.061Z",
+        "url": "/api/media/file/Payday%20-%20Order%20Sync%20Screen",
+        "thumbnailURL": null,
+        "filename": "Payday - Order Sync Screen",
+        "mimeType": "image/png",
+        "filesize": 383185,
+        "width": 2560,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 13,
+        "alt": "Payday app settings page showing configuration options for invoice creation rules, payment triggers, and store preferences within a streamlined admin interface.",
+        "updatedAt": "2026-02-17T15:06:50.533Z",
+        "createdAt": "2026-02-17T15:06:50.533Z",
+        "url": "/api/media/file/Payday%20-%20Settings%20Screen",
+        "thumbnailURL": null,
+        "filename": "Payday - Settings Screen",
+        "mimeType": "image/png",
+        "filesize": 322623,
+        "width": 2560,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      }
+    ],
+    "updatedAt": "2026-02-17T15:07:20.216Z",
+    "createdAt": "2026-02-17T14:31:24.947Z"
+  },
+  {
+    "id": 3,
+    "title": "WhereNext.to",
+    "description_markdown": "A travel discovery and booking platform that helps users explore destinations, discover experiences, generate AI-powered travel guides, and book tours worldwide. Built for WhereNext, a travel services company, the platform connects to multiple travel APIs and services to deliver a comprehensive travel planning experience with comprehensive search, persistent shopping carts, a basic booking system, personalized favorites, and real-time availability.\r\n\r\n## Tech Stack & Architecture\r\n\r\n- <span class=\"tech\" data-tag=\"next-js\">Next.js</span> 16 with <span class=\"tech\" data-tag=\"react\">React</span> 19 using a hybrid rendering strategy—Incremental Static Regeneration (ISR) for content pages, server-side rendering for dynamic data, and client-side fetching for user-specific interactions.\r\n- <span class=\"tech\" data-tag=\"apollo-client\">Apollo Client</span> 4 with <span class=\"tech\" data-tag=\"graphql\">GraphQL</span> for querying <span class=\"tech\" data-tag=\"strapi\">Strapi</span> CMS, featuring InMemoryCache for automatic request deduplication and Bearer token authentication on all requests.\r\n- <span class=\"tech\" data-tag=\"swr\">SWR</span> 2.3 for client-side data fetching with built-in caching, automatic revalidation, and optimistic UI updates for cart and favorites.\r\n- <span class=\"tech\" data-tag=\"clerk\">Clerk</span> authentication with middleware-based route protection, <span class=\"tech\" data-tag=\"google-oauth\">Google OAuth</span> integration, and automatic cart merging on login.\r\n- <span class=\"tech\" data-tag=\"algolia\">Algolia</span> full-text search with <span class=\"tech\" data-tag=\"react-instantsearch\">React InstantSearch</span> components for faceted filtering, range sliders, and instant results.\r\n- <span class=\"tech\" data-tag=\"mapbox-gl\">Mapbox GL</span> 3 and <span class=\"tech\" data-tag=\"react-map-gl\">React Map GL</span> 8 for interactive maps, geocoding, and location visualization.\r\n- External API integrations: <span class=\"tech\" data-tag=\"viator-api\">Viator API</span> for tours/activities booking, <span class=\"tech\" data-tag=\"google-places-api\">Google Places API</span> for location search, <span class=\"tech\" data-tag=\"openweathermap-api\">OpenWeatherMap API</span> for weather data, and <span class=\"tech\" data-tag=\"hubspot\">HubSpot</span> for CRM.\r\n- <span class=\"tech\" data-tag=\"scss\">SCSS</span> Modules for component-scoped styling with centralized design tokens and autoprefixing.\r\n- <span class=\"tech\" data-tag=\"react-hook-form\">React Hook Form</span> 7 with <span class=\"tech\" data-tag=\"yup\">Yup</span> validation schemas for complex multi-step booking and checkout forms.\r\n- Monitoring with <span class=\"tech\" data-tag=\"sentry\">Sentry</span> error tracking, <span class=\"tech\" data-tag=\"datadog\">Datadog</span> RUM and logs, <span class=\"tech\" data-tag=\"google-tag-manager\">Google Tag Manager</span> for GA4 events, and <span class=\"tech\" data-tag=\"vercel-analytics\">Vercel Analytics</span>.\r\n- Deployed on <span class=\"tech\" data-tag=\"vercel\">Vercel</span> with multi-environment configuration (local, development, preview, production).\r\n\r\n## Key Implementation Details\r\n\r\n**Anonymous Cart Persistence System** — Built a sophisticated temporary user ID system that enables shopping cart functionality before authentication:\r\n- Generates cryptographically random temp IDs stored in 7-day cookies\r\n- Maintains cart state in both <span class=\"tech\" data-tag=\"localstorage\">localStorage</span> (for instant loads) and backend database (for cross-device access)\r\n- Implements automatic cart merging when users sign in, combining temp cart items with authenticated user's existing cart\r\n- Handles race conditions between local and remote cart updates using timestamp-based conflict resolution\r\n\r\n**Hybrid Data Fetching Architecture** — Three-tier data strategy optimized for different content types:\r\n- ISR with `getStaticProps()` and `revalidate` for semi-static content (destinations, experiences, stories) with `fallback: \"blocking\"` for new pages\r\n- <span class=\"tech\" data-tag=\"graphql\">GraphQL</span> via <span class=\"tech\" data-tag=\"apollo-client\">Apollo Client</span> for CMS queries with InMemoryCache deduplication\r\n- <span class=\"tech\" data-tag=\"swr\">SWR</span> for user-specific data (cart, favorites) with automatic background revalidation\r\n- Custom data processing layer normalizes nested <span class=\"tech\" data-tag=\"strapi\">Strapi</span> attribute structures into flat objects via `processDestinationData()` and `processExperienceData()` functions\r\n\r\n**Context + Hook Composition Pattern** — Separates state management from business logic for cleaner, more testable code:\r\n- `UserContext` provides global state for cart, favorites, location data, and auth status\r\n- Custom hooks (`useCart()`, `useFavorites()`) consume context and expose clean APIs to components\r\n- IP-based geolocation with cookie caching prevents redundant lookups (compares current IP to cached IP before fetching)\r\n- Webview detection via sessionStorage with body class injection for platform-specific UX\r\n\r\n**Multi-Environment Configuration System** — Environment-aware architecture supporting local development through production:\r\n- `NEXT_PUBLIC_ENV` variable switches between different <span class=\"tech\" data-tag=\"strapi\">Strapi</span> backend instances\r\n- Bearer token authentication auto-injected via <span class=\"tech\" data-tag=\"apollo-client\">Apollo Client</span> link middleware\r\n- Environment-specific redirects, headers, and security policies managed in <span class=\"tech\" data-tag=\"next-js\">Next.js</span> config\r\n- Sitemap generation at build time via <span class=\"tech\" data-tag=\"webpack\">Webpack</span> hook queries all routes from CMS\r\n\r\n**Performance Optimizations** — Multiple strategies to minimize bundle size and improve load times:\r\n- Dynamic imports with `next/dynamic` and `{ ssr: false }` for heavy client-only components (maps, video players)\r\n- <span class=\"tech\" data-tag=\"cloudinary\">Cloudinary</span> image CDN with responsive sizing, WebP format, and 90-day cache TTL\r\n- Bundle analysis tooling via <span class=\"tech\" data-tag=\"next-bundle-analyzer\">@next/bundle-analyzer</span> and source-map-explorer\r\n- Production source maps enabled for debugging without exposing code (via <span class=\"tech\" data-tag=\"sentry\">Sentry</span> source map upload)\r\n\r\n## Outcome\r\n\r\nA fast, scalable travel platform handling complex booking workflows, multi-service integrations, and personalized user experiences. The hybrid rendering strategy delivers sub-second page loads for content while keeping user-specific features reactive, and the anonymous cart system enables friction-free browsing-to-booking conversion before users commit to creating accounts.\r\n",
+    "metadata": {
+      "technologies": [
+        {
+          "id": 21,
+          "name": "Next.js",
+          "description": "Next.js is a React framework that enables functionality such as server-side rendering, static site generation, API routes, and file-based routing for building full-stack web applications.",
+          "link": "https://nextjs.org",
+          "category": ["framework", "frontend"],
+          "updatedAt": "2026-02-10T15:00:21.136Z",
+          "createdAt": "2026-02-10T15:00:21.136Z"
+        },
+        {
+          "id": 30,
+          "name": "React",
+          "description": "React is a JavaScript library for building user interfaces developed by Meta that uses a component-based architecture and virtual DOM for efficient rendering of interactive web applications.",
+          "link": "https://react.dev",
+          "category": ["frontend", "framework"],
+          "updatedAt": "2026-02-10T15:00:21.199Z",
+          "createdAt": "2026-02-10T15:00:21.199Z"
+        },
+        {
+          "id": 9,
+          "name": "GraphQL",
+          "description": "GraphQL is a query language and runtime for APIs that enables clients to request exactly the data they need in a single request, providing a more efficient, powerful, and flexible alternative to REST APIs.",
+          "link": "https://graphql.org",
+          "category": ["backend", "language"],
+          "updatedAt": "2026-01-31T06:21:49.562Z",
+          "createdAt": "2026-01-31T06:21:49.562Z"
+        },
+        {
+          "id": 7,
+          "name": "SCSS",
+          "description": "SCSS (Sassy CSS) is a CSS preprocessor and syntax of Sass that extends CSS with features like variables, nested rules, mixins, and functions, making stylesheets more maintainable and powerful while remaining fully compatible with CSS syntax.",
+          "link": "https://sass-lang.com",
+          "category": ["language", "frontend", "design"],
+          "updatedAt": "2026-01-31T06:21:49.545Z",
+          "createdAt": "2026-01-31T06:21:49.545Z"
+        },
+        {
+          "id": 37,
+          "name": "Apollo Client",
+          "description": "Apollo Client is a comprehensive state management library for JavaScript that enables you to manage both local and remote data with GraphQL. It provides intelligent caching, declarative data fetching, and seamless integration with modern frontend frameworks like React.",
+          "link": "https://www.apollographql.com/docs/react/",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.052Z",
+          "createdAt": "2026-02-10T15:32:02.052Z"
+        },
+        {
+          "id": 38,
+          "name": "Strapi",
+          "description": "Strapi is an open-source headless CMS built with Node.js that allows developers to build flexible and customizable content APIs quickly. It provides a powerful admin panel, RESTful and GraphQL APIs out of the box, and supports multiple databases.",
+          "link": "https://strapi.io/",
+          "category": ["cms", "backend"],
+          "updatedAt": "2026-02-10T15:32:02.061Z",
+          "createdAt": "2026-02-10T15:32:02.061Z"
+        },
+        {
+          "id": 39,
+          "name": "SWR",
+          "description": "SWR is a React Hooks library for data fetching developed by Vercel that implements the stale-while-revalidate HTTP cache invalidation strategy. It provides features like automatic revalidation, focus tracking, request deduplication, and optimistic UI updates.",
+          "link": "https://swr.vercel.app/",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.068Z",
+          "createdAt": "2026-02-10T15:32:02.068Z"
+        },
+        {
+          "id": 40,
+          "name": "Clerk",
+          "description": "Clerk is a complete user management platform that provides authentication, user profile management, and session handling with pre-built UI components. It offers features like social login, multi-factor authentication, and organization management with minimal code implementation.",
+          "link": "https://clerk.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.074Z",
+          "createdAt": "2026-02-10T15:32:02.074Z"
+        },
+        {
+          "id": 41,
+          "name": "Google OAuth",
+          "description": "Google OAuth is an authentication protocol that allows users to sign in to applications using their Google account credentials without sharing passwords. It provides secure, token-based authentication and authorization for accessing Google APIs and third-party applications.",
+          "link": "https://developers.google.com/identity/protocols/oauth2",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.078Z",
+          "createdAt": "2026-02-10T15:32:02.078Z"
+        },
+        {
+          "id": 42,
+          "name": "Algolia",
+          "description": "Algolia is a hosted search engine API that delivers fast, relevant search experiences with features like typo-tolerance, filtering, and ranking customization. It provides millisecond-level search responses and powers search and discovery for websites and mobile applications.",
+          "link": "https://www.algolia.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.082Z",
+          "createdAt": "2026-02-10T15:32:02.082Z"
+        },
+        {
+          "id": 43,
+          "name": "React InstantSearch",
+          "description": "React InstantSearch is a React library developed by Algolia that provides ready-made UI components for building search interfaces. It offers widgets like search boxes, filters, pagination, and results displays that seamlessly integrate with Algolia's search API.",
+          "link": "https://www.algolia.com/doc/guides/building-search-ui/what-is-instantsearch/react/",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.085Z",
+          "createdAt": "2026-02-10T15:32:02.085Z"
+        },
+        {
+          "id": 44,
+          "name": "Mapbox GL",
+          "description": "Mapbox GL is a JavaScript library that uses WebGL to render interactive maps from vector tiles and Mapbox styles. It provides high-performance, customizable mapping capabilities with smooth animations, 3D terrain visualization, and extensive styling options.",
+          "link": "https://docs.mapbox.com/mapbox-gl-js/",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.089Z",
+          "createdAt": "2026-02-10T15:32:02.089Z"
+        },
+        {
+          "id": 45,
+          "name": "React Map GL",
+          "description": "React Map GL is a React wrapper for Mapbox GL JS that provides React-friendly components and hooks for building interactive map applications. It simplifies the integration of Mapbox maps into React applications with declarative syntax and component-based architecture.",
+          "link": "https://visgl.github.io/react-map-gl/",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.093Z",
+          "createdAt": "2026-02-10T15:32:02.093Z"
+        },
+        {
+          "id": 46,
+          "name": "Viator API",
+          "description": "Viator API is a RESTful API that provides access to thousands of tours, activities, and attractions worldwide from Viator's marketplace. It enables developers to search, book, and manage travel experiences programmatically for integration into travel applications.",
+          "link": "https://www.viator.com/partner/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.096Z",
+          "createdAt": "2026-02-10T15:32:02.096Z"
+        },
+        {
+          "id": 47,
+          "name": "Google Places API",
+          "description": "Google Places API is a service that returns detailed information about places including establishments, geographic locations, and points of interest using HTTP requests. It provides place search, details, photos, autocomplete, and geocoding capabilities for location-based applications.",
+          "link": "https://developers.google.com/maps/documentation/places/web-service",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.100Z",
+          "createdAt": "2026-02-10T15:32:02.100Z"
+        },
+        {
+          "id": 48,
+          "name": "OpenWeatherMap API",
+          "description": "OpenWeatherMap API is a weather data service that provides current weather, forecasts, and historical weather information for any location worldwide. It offers various weather parameters including temperature, humidity, wind speed, and precipitation with multiple data formats.",
+          "link": "https://openweathermap.org/api",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.103Z",
+          "createdAt": "2026-02-10T15:32:02.103Z"
+        },
+        {
+          "id": 49,
+          "name": "HubSpot",
+          "description": "HubSpot is a CRM platform that provides marketing, sales, and customer service software with APIs for integration into custom applications. It offers tools for lead management, email marketing, analytics, and customer relationship tracking.",
+          "link": "https://www.hubspot.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.107Z",
+          "createdAt": "2026-02-10T15:32:02.107Z"
+        },
+        {
+          "id": 50,
+          "name": "React Hook Form",
+          "description": "React Hook Form is a performant, flexible form library for React that uses uncontrolled components and React hooks to minimize re-renders. It provides easy form validation, error handling, and integration with validation libraries while maintaining excellent performance.",
+          "link": "https://react-hook-form.com/",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.111Z",
+          "createdAt": "2026-02-10T15:32:02.111Z"
+        },
+        {
+          "id": 51,
+          "name": "Yup",
+          "description": "Yup is a JavaScript schema validation library for validating object shapes and values with a simple, chainable API. It is commonly used for form validation in React applications and integrates seamlessly with form libraries like Formik and React Hook Form.",
+          "link": "https://github.com/jquense/yup",
+          "category": ["tool"],
+          "updatedAt": "2026-02-10T15:32:02.115Z",
+          "createdAt": "2026-02-10T15:32:02.115Z"
+        },
+        {
+          "id": 52,
+          "name": "Sentry",
+          "description": "Sentry is an error tracking and performance monitoring platform that helps developers identify, diagnose, and fix application errors in real-time. It provides detailed error reports, stack traces, user context, and release tracking across multiple programming languages and frameworks.",
+          "link": "https://sentry.io/",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.119Z",
+          "createdAt": "2026-02-10T15:32:02.119Z"
+        },
+        {
+          "id": 53,
+          "name": "Datadog",
+          "description": "Datadog is a monitoring and analytics platform for cloud-scale applications that provides infrastructure monitoring, application performance monitoring (APM), and log management. It offers real-time visibility into system health, performance metrics, and distributed tracing across the entire technology stack.",
+          "link": "https://www.datadoghq.com/",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.123Z",
+          "createdAt": "2026-02-10T15:32:02.122Z"
+        },
+        {
+          "id": 54,
+          "name": "Google Tag Manager",
+          "description": "Google Tag Manager is a tag management system that allows you to quickly update measurement codes and related code snippets on your website or mobile app without modifying the codebase. It simplifies the process of managing marketing tags, analytics tracking, and third-party scripts.",
+          "link": "https://tagmanager.google.com/",
+          "category": ["tool"],
+          "updatedAt": "2026-02-10T15:32:02.126Z",
+          "createdAt": "2026-02-10T15:32:02.126Z"
+        },
+        {
+          "id": 56,
+          "name": "Vercel",
+          "description": "Vercel is a cloud platform for static sites and serverless functions that enables developers to deploy web applications with zero configuration. It provides automatic deployments, edge network distribution, serverless functions, and seamless integration with frontend frameworks like Next.js.",
+          "link": "https://vercel.com/",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.133Z",
+          "createdAt": "2026-02-10T15:32:02.133Z"
+        },
+        {
+          "id": 57,
+          "name": "localStorage",
+          "description": "localStorage is a Web Storage API that allows web applications to store key-value pairs in a web browser with no expiration date. It provides a simple synchronous API for persisting data locally across browser sessions with a storage limit typically around 5-10MB per origin.",
+          "link": "https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage",
+          "category": ["frontend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.137Z",
+          "createdAt": "2026-02-10T15:32:02.137Z"
+        },
+        {
+          "id": 58,
+          "name": "Webpack",
+          "description": "Webpack is a static module bundler for JavaScript applications that processes and bundles application assets including JavaScript, CSS, images, and fonts. It provides code splitting, tree shaking, hot module replacement, and extensive plugin ecosystem for optimizing build output.",
+          "link": "https://webpack.js.org/",
+          "category": ["tool"],
+          "updatedAt": "2026-02-10T15:32:02.140Z",
+          "createdAt": "2026-02-10T15:32:02.140Z"
+        },
+        {
+          "id": 59,
+          "name": "Cloudinary",
+          "description": "Cloudinary is a cloud-based media management platform that provides end-to-end image and video management including upload, storage, optimization, transformation, and delivery via CDN. It offers automatic format conversion, responsive image delivery, and AI-powered content analysis.",
+          "link": "https://cloudinary.com/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:32:02.145Z",
+          "createdAt": "2026-02-10T15:32:02.145Z"
+        },
+        {
+          "id": 60,
+          "name": "@next/bundle-analyzer",
+          "description": "@next/bundle-analyzer is a webpack bundle analyzer plugin specifically designed for Next.js applications that visualizes the size of webpack output files with interactive treemaps. It helps developers identify and optimize large dependencies and reduce bundle sizes in Next.js projects.",
+          "link": "https://www.npmjs.com/package/@next/bundle-analyzer",
+          "category": ["tool"],
+          "updatedAt": "2026-02-10T15:32:02.152Z",
+          "createdAt": "2026-02-10T15:32:02.152Z"
+        }
+      ]
+    },
+    "liveLink": "https://wherenext.to",
+    "thumbnail": null,
+    "images": [
+      {
+        "id": 5,
+        "alt": "Screenshot of the WhereNext homepage. The hero section shows a group of smiling travelers white-water rafting in Bali with a 'Read more' CTA button. A sidebar displays thumbnail previews of featured experiences including Tanzania, Thai Buddhism in Thailand, Culture Week in Uganda, English Teaching in Chile, and Marine Park and Animal Rescue in Costa Rica. Below, a 'Volunteer and Adventure Experiences' grid shows three cards: Farming Experience in Chile, Culture Week in Zanzibar Tanzania, and Lemur Conservation in Madagascar.",
+        "updatedAt": "2026-02-10T16:00:34.330Z",
+        "createdAt": "2026-02-10T16:00:34.330Z",
+        "url": "/api/media/file/WhereNext.to%20Hero",
+        "thumbnailURL": null,
+        "filename": "WhereNext.to Hero",
+        "mimeType": "image/png",
+        "filesize": 4025309,
+        "width": 2200,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 6,
+        "alt": "Screenshot of the WhereNext shopping cart page. A cart item shows Surfing & Beach Cleaning in Peru, located in Chiclayo, Peru, with a start date of 2026-02-19, 3 weeks duration, 1 person, at $430 per week totalling $1,290. The right sidebar shows a Cart Summary with a total of USD $1,290, a note that no payment is required at this time, a voucher code field, and a blue Send Enquiry button. At the bottom, two sustainability badges indicate 1% for the Planet and 25 trees planted via OneTreePlanted per purchase.",
+        "updatedAt": "2026-02-10T16:01:56.388Z",
+        "createdAt": "2026-02-10T16:01:56.388Z",
+        "url": "/api/media/file/WhereNext.to%20Cart",
+        "thumbnailURL": null,
+        "filename": "WhereNext.to Cart",
+        "mimeType": "image/png",
+        "filesize": 395980,
+        "width": 2200,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 7,
+        "alt": "Screenshot of the WhereNext contact page split into two columns. The left side contains a contact form with fields for first name, last name, phone (pre-filled with Thailand +66 country code), email, and message, with a Submit button and a privacy policy notice. The right side on a dark background lists contact options: email at contact@wherenext.to, chat via WhatsApp and Facebook Messenger, a postal address for WhereNext Experiences Pty. Ltd. in Tamarama NSW Australia, social media links for Instagram, Facebook, Twitter and LinkedIn, and an Adventure Travel Trade Association badge.",
+        "updatedAt": "2026-02-10T16:01:56.817Z",
+        "createdAt": "2026-02-10T16:01:56.817Z",
+        "url": "/api/media/file/WhereNext.to%20Contact%20Page",
+        "thumbnailURL": null,
+        "filename": "WhereNext.to Contact Page",
+        "mimeType": "image/png",
+        "filesize": 398147,
+        "width": 2200,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 8,
+        "alt": "Screenshot of the WhereNext Peru destination page. The hero slider shows a panoramic aerial view of La Merced with dense rainforest, terraced farmland, and a winding river valley under dramatic clouds. A sidebar shows destination thumbnails including All Smiles!, Machu Picchu, La Merced, and Colca Canyon. Below the hero, a breadcrumb reads South America > Peru, followed by a Peru Travel Information section with tabbed navigation covering Facts, Experiences, Travel Guides, Things to Do, Stories, Weather, Food, Accommodation, Transportation, and Money. A Key Facts section lists Lima as the capital, and a map of western South America is partially visible.",
+        "updatedAt": "2026-02-10T16:01:58.526Z",
+        "createdAt": "2026-02-10T16:01:58.526Z",
+        "url": "/api/media/file/WhereNext.to%20Destination%20Page",
+        "thumbnailURL": null,
+        "filename": "WhereNext.to Destination Page",
+        "mimeType": "image/png",
+        "filesize": 2891807,
+        "width": 2200,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 9,
+        "alt": "Screenshot of the WhereNext experience detail page for Marine Park & Animal Rescue in Costa Rica. The hero slider features a close-up photograph of a colorful Keel Billed Toucan perched on a mossy branch, with overlay text noting forest destruction and habitat loss as primary threats. A sidebar shows related experience thumbnails. Below, tabbed navigation includes Overview, Impact, Location, Itinerary, Inclusions, Options, More Info, and Related. The Overview section describes working with local staff to feed, clean, and provide medical care to animals. A booking panel on the right shows the experience is located in Esparza, Costa Rica, categorized as Animals, Backpacker style, currently Open, priced at $735 per week with a 4-week minimum duration and an Add to Cart button.",
+        "updatedAt": "2026-02-10T16:02:00.046Z",
+        "createdAt": "2026-02-10T16:02:00.046Z",
+        "url": "/api/media/file/WhereNext.to%20Experience%20Page",
+        "thumbnailURL": null,
+        "filename": "WhereNext.to Experience Page",
+        "mimeType": "image/png",
+        "filesize": 2106621,
+        "width": 2200,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      }
+    ],
+    "updatedAt": "2026-02-10T16:02:18.750Z",
+    "createdAt": "2026-02-10T15:31:18.674Z"
+  },
+  {
+    "id": 2,
+    "title": "AndriBraun.dev - Payload CMS",
+    "description_markdown": "A headless CMS built for this very website! It makes managing portfolio projects, technologies, and media assets a breeze, because I spend most of my time actually building things and honestly don't have that much left over to talk up how great they are. The standout feature of this little project is an AI-powered technology extraction system that reads project descriptions and automatically identifies frameworks, tools, and libraries mentioned, creating a cataloged technology database without manual data entry--Because I work hard at being lazy! And, of course, the whole thing is built with modern Payload CMS architecture that prioritizes type safety, automated migrations, and cloud-native storage for a maintainable, production-ready content management system.\r\n\r\n## Tech Stack & Architecture\r\n\r\n- <span class=\"tech\" data-tag=\"payload-cms\">Payload CMS</span> 3.69 as the headless CMS framework with <span class=\"tech\" data-tag=\"next-js\">Next.js</span> 16.1 App Router integration for the admin panel and API\r\n- <span class=\"tech\" data-tag=\"postgresql\">PostgreSQL</span> database with automated schema migrations using <span class=\"tech\" data-tag=\"payload-cms\">Payload's</span> built-in migration system\r\n- <span class=\"tech\" data-tag=\"typescript\">TypeScript</span> strict mode throughout with auto-generated types from <span class=\"tech\" data-tag=\"payload-cms\">Payload</span> collections\r\n- <span class=\"tech\" data-tag=\"cloudflare-r2\">Cloudflare R2</span> (S3-compatible) cloud storage for media assets using <span class=\"tech\" data-tag=\"aws-sdk\">AWS SDK</span>\r\n- <span class=\"tech\" data-tag=\"claude\">Claude</span> AI (Anthropic) integration with structured JSON outputs for intelligent content processing\r\n- <span class=\"tech\" data-tag=\"lexical\">Lexical</span> rich text editor for project descriptions with markdown code field support\r\n- <span class=\"tech\" data-tag=\"docker\">Docker</span> multi-stage builds with <span class=\"tech\" data-tag=\"node-js\">Node.js</span> 22 Alpine for production deployment\r\n- <span class=\"tech\" data-tag=\"react\">React</span> 19 for UI components with <span class=\"tech\" data-tag=\"next-js\">Next.js</span> Server Actions for mutations\r\n- Testing suite with <span class=\"tech\" data-tag=\"vitest\">Vitest</span> for integration tests and <span class=\"tech\" data-tag=\"playwright\">Playwright</span> for E2E tests\r\n- Development workflow automation with <span class=\"tech\" data-tag=\"husky\">Husky</span>, <span class=\"tech\" data-tag=\"lint-staged\">lint-staged</span>, <span class=\"tech\" data-tag=\"eslint\">ESLint</span>, and <span class=\"tech\" data-tag=\"prettier\">Prettier</span>\r\n\r\n## Key Implementation Details\r\n\r\n**AI-Powered Technology Extraction** — Built a two-phase AI extraction system that analyzes project descriptions to automatically identify and catalog technologies:\r\n\r\n- First pass extracts technology names from both rich text and markdown description fields using <span class=\"tech\" data-tag=\"claude\">Claude</span> with structured JSON output\r\n- Second pass fetches complete details (official URLs, descriptions, categories) for new technologies not already in the database\r\n- Validates all extracted data (URL format, required fields, category assignment) before saving\r\n- Merges new technologies with existing ones and automatically links them to the project via relationships\r\n- Custom React UI component integrated directly into <span class=\"tech\" data-tag=\"payload-cms\">Payload's</span> admin panel with loading states and detailed toast notifications\r\n\r\n**Automated Database Migration Workflow** — Foolproof migration system that prevents database corruption in development:\r\n\r\n- <span class=\"tech\" data-tag=\"husky\">Husky</span> pre-commit hook automatically runs `payload migrate:create` before every commit to capture schema changes\r\n- Build script runs `payload migrate` before <span class=\"tech\" data-tag=\"next-js\">Next.js</span> build to apply migrations in production\r\n- Development server runs without migrations to avoid database corruption from accidental schema drift\r\n- Migration files use <span class=\"tech\" data-tag=\"payload-cms\">Payload's</span> auto-generated <span class=\"tech\" data-tag=\"postgresql\">PostgreSQL</span> migration system with full type safety\r\n\r\n**Cloud-Native Media Management** — S3-compatible storage integration with <span class=\"tech\" data-tag=\"cloudflare-r2\">Cloudflare R2</span>:\r\n\r\n- <span class=\"tech\" data-tag=\"payload-cms\">Payload's</span> S3 storage adapter configured for R2's S3-compatible API with path-style URLs\r\n- <span class=\"tech\" data-tag=\"sharp\">Sharp</span> image processing for automatic thumbnail generation and optimization\r\n- Media collection with upload relationship fields for thumbnails and image galleries\r\n- Environment-based configuration for bucket names, endpoints, and credentials\r\n\r\n**Type-Safe Collection Architecture** — Structured content models with full <span class=\"tech\" data-tag=\"typescript\">TypeScript</span> support:\r\n\r\n- Projects collection with rich text and markdown fields, technology relationships, and media uploads\r\n- Technologies collection with name, description, official link, and multi-select category system (Frontend, Backend, Database, DevOps, etc.)\r\n- Auto-generated <span class=\"tech\" data-tag=\"typescript\">TypeScript</span> types from collection schemas for end-to-end type safety\r\n- Custom admin components injected into document edit views using <span class=\"tech\" data-tag=\"payload-cms\">Payload's</span> component override system\r\n\r\n**Production-Ready Docker Deployment** — Multi-stage <span class=\"tech\" data-tag=\"docker\">Docker</span> build optimized for minimal image size:\r\n\r\n- Builder stage runs migrations during build using <span class=\"tech\" data-tag=\"docker\">BuildKit</span> secrets for secure credential handling\r\n- <span class=\"tech\" data-tag=\"next-js\">Next.js</span> standalone output with automatic dependency tracing to reduce image size\r\n- Persistent storage volume mount for data directory with proper permissions\r\n- Non-root user execution for enhanced security\r\n\r\n## Outcome\r\n\r\nA production-grade headless CMS that eliminates manual technology cataloging through AI automation, saving hours of data entry while maintaining data quality through validation. The automated migration workflow and comprehensive testing ensure database integrity across development and production, while cloud storage and Docker deployment provide a scalable, maintainable foundation for portfolio content management.\r\n",
+    "metadata": {
+      "technologies": [
+        {
+          "id": 5,
+          "name": "TypeScript",
+          "description": "TypeScript is a strongly typed programming language that builds on JavaScript by adding optional static type definitions, enabling better tooling, error detection at compile-time, and improved code maintainability for large-scale applications.",
+          "link": "https://www.typescriptlang.org",
+          "category": ["language"],
+          "updatedAt": "2026-01-31T06:21:49.525Z",
+          "createdAt": "2026-01-31T06:21:49.525Z"
+        },
+        {
+          "id": 17,
+          "name": "Husky",
+          "description": "Husky is a tool that makes Git hooks easy, allowing developers to automatically run scripts like linters, tests, or formatters before commits and pushes to maintain code quality and prevent bad commits from entering the repository.",
+          "link": "https://typicode.github.io/husky",
+          "category": ["tool", "devops"],
+          "updatedAt": "2026-01-31T06:21:49.627Z",
+          "createdAt": "2026-01-31T06:21:49.627Z"
+        },
+        {
+          "id": 14,
+          "name": "ESLint",
+          "description": "ESLint is a pluggable and configurable JavaScript linter that statically analyzes code to quickly find and fix problems, enforce coding standards, and maintain code quality across development teams.",
+          "link": "https://eslint.org",
+          "category": ["tool"],
+          "updatedAt": "2026-01-31T06:21:49.603Z",
+          "createdAt": "2026-01-31T06:21:49.603Z"
+        },
+        {
+          "id": 15,
+          "name": "Prettier",
+          "description": "Prettier is an opinionated code formatter that enforces a consistent code style by parsing code and reprinting it with its own rules, supporting JavaScript, TypeScript, CSS, HTML, and many other languages.",
+          "link": "https://prettier.io",
+          "category": ["tool"],
+          "updatedAt": "2026-01-31T06:21:49.611Z",
+          "createdAt": "2026-01-31T06:21:49.611Z"
+        },
+        {
+          "id": 20,
+          "name": "Payload CMS",
+          "description": "Payload is a headless CMS and application framework built with TypeScript, Node.js, React and MongoDB that provides a powerful admin panel, authentication, and flexible content management capabilities.",
+          "link": "https://payloadcms.com",
+          "category": ["cms", "backend"],
+          "updatedAt": "2026-02-10T15:00:21.124Z",
+          "createdAt": "2026-02-10T15:00:21.124Z"
+        },
+        {
+          "id": 21,
+          "name": "Next.js",
+          "description": "Next.js is a React framework that enables functionality such as server-side rendering, static site generation, API routes, and file-based routing for building full-stack web applications.",
+          "link": "https://nextjs.org",
+          "category": ["framework", "frontend"],
+          "updatedAt": "2026-02-10T15:00:21.136Z",
+          "createdAt": "2026-02-10T15:00:21.136Z"
+        },
+        {
+          "id": 22,
+          "name": "PostgreSQL",
+          "description": "PostgreSQL is a powerful, open-source object-relational database system with over 35 years of active development that offers robust features, ACID compliance, and extensibility.",
+          "link": "https://www.postgresql.org",
+          "category": ["database"],
+          "updatedAt": "2026-02-10T15:00:21.144Z",
+          "createdAt": "2026-02-10T15:00:21.144Z"
+        },
+        {
+          "id": 23,
+          "name": "Cloudflare R2",
+          "description": "Cloudflare R2 is an S3-compatible object storage service that allows developers to store large amounts of unstructured data without egress bandwidth fees.",
+          "link": "https://www.cloudflare.com/products/r2/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:00:21.153Z",
+          "createdAt": "2026-02-10T15:00:21.153Z"
+        },
+        {
+          "id": 24,
+          "name": "AWS SDK",
+          "description": "AWS SDK is a collection of software development kits that provide APIs and tools for developers to build applications that integrate with Amazon Web Services cloud infrastructure and services.",
+          "link": "https://aws.amazon.com/sdk-for-javascript/",
+          "category": ["tool", "backend"],
+          "updatedAt": "2026-02-10T15:00:21.160Z",
+          "createdAt": "2026-02-10T15:00:21.160Z"
+        },
+        {
+          "id": 25,
+          "name": "Claude",
+          "description": "Claude is an AI assistant created by Anthropic that can help with a wide variety of tasks including analysis, writing, coding, math, and answering questions with advanced reasoning capabilities.",
+          "link": "https://www.anthropic.com/claude",
+          "category": ["tool"],
+          "updatedAt": "2026-02-10T15:00:21.166Z",
+          "createdAt": "2026-02-10T15:00:21.166Z"
+        },
+        {
+          "id": 26,
+          "name": "Anthropic",
+          "description": "Anthropic is an AI safety company that builds reliable, interpretable, and steerable AI systems, best known for creating Claude, their family of large language models.",
+          "link": "https://www.anthropic.com",
+          "category": ["tool"],
+          "updatedAt": "2026-02-10T15:00:21.172Z",
+          "createdAt": "2026-02-10T15:00:21.172Z"
+        },
+        {
+          "id": 28,
+          "name": "Docker",
+          "description": "Docker is a platform that uses containerization technology to package applications and their dependencies into standardized units called containers, enabling consistent deployment across different environments.",
+          "link": "https://www.docker.com",
+          "category": ["devops", "tool"],
+          "updatedAt": "2026-02-10T15:00:21.186Z",
+          "createdAt": "2026-02-10T15:00:21.186Z"
+        },
+        {
+          "id": 29,
+          "name": "Node.js",
+          "description": "Node.js is a JavaScript runtime built on Chrome's V8 engine that allows developers to run JavaScript on the server-side, enabling scalable network applications with non-blocking I/O.",
+          "link": "https://nodejs.org",
+          "category": ["backend", "language"],
+          "updatedAt": "2026-02-10T15:00:21.193Z",
+          "createdAt": "2026-02-10T15:00:21.193Z"
+        },
+        {
+          "id": 30,
+          "name": "React",
+          "description": "React is a JavaScript library for building user interfaces developed by Meta that uses a component-based architecture and virtual DOM for efficient rendering of interactive web applications.",
+          "link": "https://react.dev",
+          "category": ["frontend", "framework"],
+          "updatedAt": "2026-02-10T15:00:21.199Z",
+          "createdAt": "2026-02-10T15:00:21.199Z"
+        },
+        {
+          "id": 31,
+          "name": "Vitest",
+          "description": "Vitest is a blazing fast unit test framework powered by Vite that provides a Jest-compatible API with native ESM support, TypeScript integration, and smart watch mode.",
+          "link": "https://vitest.dev",
+          "category": ["tool"],
+          "updatedAt": "2026-02-10T15:00:21.207Z",
+          "createdAt": "2026-02-10T15:00:21.207Z"
+        },
+        {
+          "id": 32,
+          "name": "Playwright",
+          "description": "Playwright is an end-to-end testing framework developed by Microsoft that enables reliable automation of Chromium, Firefox, and WebKit browsers with a single API for modern web applications.",
+          "link": "https://playwright.dev",
+          "category": ["tool"],
+          "updatedAt": "2026-02-10T15:00:21.213Z",
+          "createdAt": "2026-02-10T15:00:21.213Z"
+        },
+        {
+          "id": 33,
+          "name": "lint-staged",
+          "description": "lint-staged is a tool that runs linters and code formatters against staged git files, ensuring code quality by checking only modified files before they are committed.",
+          "link": "https://github.com/lint-staged/lint-staged",
+          "category": ["tool", "devops"],
+          "updatedAt": "2026-02-10T15:00:21.221Z",
+          "createdAt": "2026-02-10T15:00:21.221Z"
+        },
+        {
+          "id": 36,
+          "name": "Amazon S3",
+          "description": "Amazon S3 (Simple Storage Service) is a scalable object storage service offered by AWS that provides industry-leading durability, availability, and performance for storing and retrieving any amount of data.",
+          "link": "https://aws.amazon.com/s3/",
+          "category": ["backend", "tool"],
+          "updatedAt": "2026-02-10T15:00:21.243Z",
+          "createdAt": "2026-02-10T15:00:21.243Z"
+        }
+      ]
+    },
+    "liveLink": "https://cms.andribraun.dev",
+    "thumbnail": null,
+    "images": [
+      {
+        "id": 4,
+        "alt": "Screenshot of a Payload CMS admin dashboard in dark mode. The Collections section displays five collection cards arranged in a grid: Users, Media, Projects, Technologies, and Tags. Each card has a plus icon for adding new entries. The top navigation bar shows the Payload logo, a Dashboard breadcrumb, and a user avatar in the top right corner.",
+        "updatedAt": "2026-02-10T15:18:46.256Z",
+        "createdAt": "2026-02-10T15:18:46.256Z",
+        "url": "/api/media/file/andribraun.dev-cms-hero.png",
+        "thumbnailURL": null,
+        "filename": "andribraun.dev-cms-hero.png",
+        "mimeType": "image/png",
+        "filesize": 47371,
+        "width": 2200,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      }
+    ],
+    "updatedAt": "2026-02-10T15:18:56.761Z",
+    "createdAt": "2026-02-10T14:59:55.782Z"
+  },
+  {
+    "id": 1,
+    "title": "Online Taxman",
+    "description_markdown": "A fast, efficient tax services website built for OTM, a financial services company working with US expats, entrepreneurs, and businesses with international operations. Built using a static-first architecture that delivers zero JavaScript by default while keeping things interactive where it matters!\r\n\r\n## Tech Stack & Architecture\r\n\r\n- <span class=\"tech\" data-tag=\"astro\">Astro</span> + <span class=\"tech\" data-tag=\"svelte\">Svelte</span> hybrid with islands hydration. <span class=\"tech\" data-tag=\"astro\">Astro</span> handles the static content while <span class=\"tech\" data-tag=\"svelte\">Svelte 5</span>'s modern, low-overhead components power the interactive bits.\r\n- <span class=\"tech\" data-tag=\"zag\">Zag.js</span> headless UI state machines handle accessible patterns like accordions, dialogs, and multi-step forms—much more efficient than building everything from scratch!\r\n- <span class=\"tech\" data-tag=\"typescript\">TypeScript</span> strict mode with <span class=\"tech\" data-tag=\"zod\">Zod v4</span> runtime validation\r\n- <span class=\"tech\" data-tag=\"scss\">SCSS Modules</span> for component-scoped styling with centralized design tokens\r\n- <span class=\"tech\" data-tag=\"wordpress\">WordPress</span> integration via <span class=\"tech\" data-tag=\"graphql\">GraphQL</span> and custom <span class=\"tech\" data-tag=\"astro\">Astro</span> content loaders\r\n- Deployed on <span class=\"tech\" data-tag=\"netlify\">Netlify</span> with edge functions and <span class=\"tech\" data-tag=\"turso-sqlite\">Turso SQLite</span> for logging\r\n\r\n## Key Implementation Details\r\n\r\n**Unified PageData Architecture** — Built a single source of truth system for routing, SEO metadata, sitemap control, and redirects that works across static pages, dynamic routes, and CMS content. The data directory mirrors the pages directory exactly, so finding things is straightforward.\r\n\r\n**Custom Content Registry** — Automatic page discovery using import.meta.glob that makes site-wide queries for sitemaps and navigation dead simple without manual registration.\r\n\r\n**Multi-step Form Engine** — Complex consultation workflows with:\r\n\r\n- Conditional validation using <span class=\"tech\" data-tag=\"zod\">Zod</span>\r\n- Session persistence via browser storage\r\n- <span class=\"tech\" data-tag=\"zapier\">Zapier</span> webhook integration for CRM sync\r\n\r\n**Development Workflow** — Comprehensive quality tooling including:\r\n\r\n- <span class=\"tech\" data-tag=\"eslint\">ESLint</span>, <span class=\"tech\" data-tag=\"prettier\">Prettier</span>, <span class=\"tech\" data-tag=\"stylelint\">Stylelint</span>\r\n- <span class=\"tech\" data-tag=\"husky\">Husky</span> pre-commit hooks\r\n- Bundle analysis via <span class=\"tech\" data-tag=\"rollup-visualizer\">Rollup Visualizer</span>\r\n- Dependency architecture validation\r\n\r\n## Outcome\r\n\r\nA fast, accessible, and maintainable platform that handles complex international tax workflows while keeping performance solid for users worldwide. The modular architecture and strict typing make it easy to extend as the business grows.",
+    "metadata": {
+      "technologies": [
+        {
+          "id": 1,
+          "name": "Astro",
+          "description": "Astro is a modern web framework for building fast, content-focused websites that ships zero JavaScript by default and supports multiple UI frameworks like React, Vue, and Svelte through its islands architecture.",
+          "link": "https://astro.build",
+          "category": ["framework", "frontend"],
+          "updatedAt": "2026-01-31T06:21:49.473Z",
+          "createdAt": "2026-01-31T06:21:49.469Z"
+        },
+        {
+          "id": 2,
+          "name": "Svelte",
+          "description": "Svelte is a radical new approach to building user interfaces that shifts the work into a compile step, producing highly optimized vanilla JavaScript that surgically updates the DOM without the overhead of virtual DOM diffing.",
+          "link": "https://svelte.dev",
+          "category": ["framework", "frontend"],
+          "updatedAt": "2026-01-31T06:21:49.494Z",
+          "createdAt": "2026-01-31T06:21:49.493Z"
+        },
+        {
+          "id": 3,
+          "name": "Svelte 5",
+          "description": "Svelte 5 is the latest major version of Svelte that introduces runes, a new reactivity system offering more powerful and flexible state management with improved performance and developer experience.",
+          "link": "https://svelte.dev",
+          "category": ["framework", "frontend"],
+          "updatedAt": "2026-01-31T06:21:49.504Z",
+          "createdAt": "2026-01-31T06:21:49.504Z"
+        },
+        {
+          "id": 4,
+          "name": "Zag.js",
+          "description": "Zag.js is a collection of framework-agnostic UI component patterns built with state machines, providing accessible and composable logic for building design systems across React, Vue, and Solid.",
+          "link": "https://zagjs.com",
+          "category": ["framework", "frontend", "tool"],
+          "updatedAt": "2026-01-31T06:21:49.516Z",
+          "createdAt": "2026-01-31T06:21:49.516Z"
+        },
+        {
+          "id": 5,
+          "name": "TypeScript",
+          "description": "TypeScript is a strongly typed programming language that builds on JavaScript by adding optional static type definitions, enabling better tooling, error detection at compile-time, and improved code maintainability for large-scale applications.",
+          "link": "https://www.typescriptlang.org",
+          "category": ["language"],
+          "updatedAt": "2026-01-31T06:21:49.525Z",
+          "createdAt": "2026-01-31T06:21:49.525Z"
+        },
+        {
+          "id": 6,
+          "name": "Zod",
+          "description": "Zod is a TypeScript-first schema validation library with static type inference, allowing developers to define schemas that automatically generate TypeScript types while providing runtime validation for data structures.",
+          "link": "https://zod.dev",
+          "category": ["tool", "language"],
+          "updatedAt": "2026-01-31T06:21:49.535Z",
+          "createdAt": "2026-01-31T06:21:49.535Z"
+        },
+        {
+          "id": 7,
+          "name": "SCSS",
+          "description": "SCSS (Sassy CSS) is a CSS preprocessor and syntax of Sass that extends CSS with features like variables, nested rules, mixins, and functions, making stylesheets more maintainable and powerful while remaining fully compatible with CSS syntax.",
+          "link": "https://sass-lang.com",
+          "category": ["language", "frontend", "design"],
+          "updatedAt": "2026-01-31T06:21:49.545Z",
+          "createdAt": "2026-01-31T06:21:49.545Z"
+        },
+        {
+          "id": 8,
+          "name": "WordPress",
+          "description": "WordPress is the world's most popular open-source content management system powering over 40% of websites, offering a flexible platform for building everything from simple blogs to complex enterprise websites with its extensive plugin and theme ecosystem.",
+          "link": "https://wordpress.org",
+          "category": ["cms", "backend"],
+          "updatedAt": "2026-01-31T06:21:49.552Z",
+          "createdAt": "2026-01-31T06:21:49.552Z"
+        },
+        {
+          "id": 9,
+          "name": "GraphQL",
+          "description": "GraphQL is a query language and runtime for APIs that enables clients to request exactly the data they need in a single request, providing a more efficient, powerful, and flexible alternative to REST APIs.",
+          "link": "https://graphql.org",
+          "category": ["backend", "language"],
+          "updatedAt": "2026-01-31T06:21:49.562Z",
+          "createdAt": "2026-01-31T06:21:49.562Z"
+        },
+        {
+          "id": 10,
+          "name": "Netlify",
+          "description": "Netlify is a cloud platform for automating modern web projects, offering continuous deployment, serverless functions, edge computing, and global CDN distribution with seamless Git integration for hosting static sites and frontend applications.",
+          "link": "https://www.netlify.com",
+          "category": ["devops"],
+          "updatedAt": "2026-01-31T06:21:49.570Z",
+          "createdAt": "2026-01-31T06:21:49.570Z"
+        },
+        {
+          "id": 11,
+          "name": "Turso",
+          "description": "Turso is an edge-hosted distributed database built on libSQL (SQLite fork) that brings SQLite to the edge with automatic replication, providing low-latency database access at the edge while maintaining SQLite's simplicity and reliability.",
+          "link": "https://turso.tech",
+          "category": ["database", "backend"],
+          "updatedAt": "2026-01-31T06:21:49.579Z",
+          "createdAt": "2026-01-31T06:21:49.578Z"
+        },
+        {
+          "id": 12,
+          "name": "SQLite",
+          "description": "SQLite is a self-contained, serverless, zero-configuration SQL database engine that is the most widely deployed database in the world, embedded in countless applications, mobile devices, and browsers for local data storage.",
+          "link": "https://www.sqlite.org",
+          "category": ["database"],
+          "updatedAt": "2026-01-31T06:21:49.587Z",
+          "createdAt": "2026-01-31T06:21:49.586Z"
+        },
+        {
+          "id": 13,
+          "name": "Zapier",
+          "description": "Zapier is a no-code automation platform that connects over 5,000 web applications, enabling users to create automated workflows (Zaps) that move data and trigger actions between different services without writing code.",
+          "link": "https://zapier.com",
+          "category": ["tool", "devops"],
+          "updatedAt": "2026-01-31T06:21:49.595Z",
+          "createdAt": "2026-01-31T06:21:49.595Z"
+        },
+        {
+          "id": 14,
+          "name": "ESLint",
+          "description": "ESLint is a pluggable and configurable JavaScript linter that statically analyzes code to quickly find and fix problems, enforce coding standards, and maintain code quality across development teams.",
+          "link": "https://eslint.org",
+          "category": ["tool"],
+          "updatedAt": "2026-01-31T06:21:49.603Z",
+          "createdAt": "2026-01-31T06:21:49.603Z"
+        },
+        {
+          "id": 15,
+          "name": "Prettier",
+          "description": "Prettier is an opinionated code formatter that enforces a consistent code style by parsing code and reprinting it with its own rules, supporting JavaScript, TypeScript, CSS, HTML, and many other languages.",
+          "link": "https://prettier.io",
+          "category": ["tool"],
+          "updatedAt": "2026-01-31T06:21:49.611Z",
+          "createdAt": "2026-01-31T06:21:49.611Z"
+        },
+        {
+          "id": 16,
+          "name": "Stylelint",
+          "description": "Stylelint is a modern CSS linter that helps enforce consistent conventions and avoid errors in stylesheets, supporting CSS, SCSS, Sass, and other CSS-like syntaxes with over 170 built-in rules.",
+          "link": "https://stylelint.io",
+          "category": ["tool"],
+          "updatedAt": "2026-01-31T06:21:49.620Z",
+          "createdAt": "2026-01-31T06:21:49.619Z"
+        },
+        {
+          "id": 17,
+          "name": "Husky",
+          "description": "Husky is a tool that makes Git hooks easy, allowing developers to automatically run scripts like linters, tests, or formatters before commits and pushes to maintain code quality and prevent bad commits from entering the repository.",
+          "link": "https://typicode.github.io/husky",
+          "category": ["tool", "devops"],
+          "updatedAt": "2026-01-31T06:21:49.627Z",
+          "createdAt": "2026-01-31T06:21:49.627Z"
+        },
+        {
+          "id": 18,
+          "name": "Rollup",
+          "description": "Rollup is a module bundler for JavaScript that compiles small pieces of code into larger, optimized bundles, specializing in ES modules and producing smaller, more efficient builds ideal for libraries and applications.",
+          "link": "https://rollupjs.org",
+          "category": ["tool", "devops"],
+          "updatedAt": "2026-01-31T06:21:49.636Z",
+          "createdAt": "2026-01-31T06:21:49.636Z"
+        },
+        {
+          "id": 19,
+          "name": "JavaScript",
+          "description": "JavaScript is a high-level, dynamic programming language that is one of the core technologies of the web alongside HTML and CSS, enabling interactive web pages and running on both client-side browsers and server-side environments like Node.js.",
+          "link": "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+          "category": ["language"],
+          "updatedAt": "2026-01-31T06:21:49.644Z",
+          "createdAt": "2026-01-31T06:21:49.644Z"
+        }
+      ]
+    },
+    "liveLink": "https://onlinetaxman.com",
+    "thumbnail": null,
+    "images": [
+      {
+        "id": 1,
+        "alt": "Online Taxman onboarding modal asking users to select their tax needs, with options for US expat tax services, US company services, bookkeeping, advanced tax strategies, and other tax situations.",
+        "updatedAt": "2026-01-20T16:07:48.389Z",
+        "createdAt": "2026-01-20T16:07:48.388Z",
+        "url": "/api/media/file/%20form",
+        "thumbnailURL": null,
+        "filename": " form",
+        "mimeType": "image/png",
+        "filesize": 251128,
+        "width": 2200,
+        "height": 1440,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 2,
+        "alt": "Online Taxman homepage hero section featuring the headline ‘Global perspective. US tax expertise.’ alongside a call-to-action button and a photo of a tax expert, highlighting services for US expats and global entrepreneurs.",
+        "updatedAt": "2026-01-20T16:07:49.015Z",
+        "createdAt": "2026-01-20T16:07:49.015Z",
+        "url": "/api/media/file/Homepage%20hero%20(wide%20layout)",
+        "thumbnailURL": null,
+        "filename": "Homepage hero (wide layout)",
+        "mimeType": "image/png",
+        "filesize": 653461,
+        "width": 2200,
+        "height": 1439,
+        "focalX": 50,
+        "focalY": 50
+      },
+      {
+        "id": 3,
+        "alt": "Online Taxman homepage showcasing global US tax services, including expat tax preparation and US company support, with featured service cards and a prominent call to get started.",
+        "updatedAt": "2026-01-20T16:07:49.388Z",
+        "createdAt": "2026-01-20T16:07:49.388Z",
+        "url": "/api/media/file/cropped%20layout)",
+        "thumbnailURL": null,
+        "filename": "cropped layout)",
+        "mimeType": "image/png",
+        "filesize": 482611,
+        "width": 1480,
+        "height": 1480,
+        "focalX": 50,
+        "focalY": 50
+      }
+    ],
+    "updatedAt": "2026-02-10T14:44:28.765Z",
+    "createdAt": "2026-01-20T14:49:06.174Z"
+  }
+]

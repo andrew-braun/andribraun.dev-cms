@@ -70,7 +70,7 @@ Use a bulleted list to describe:
 
 ### 3. Key Implementation Details
 
-Highlight 3-5 notable implementation aspects using **bold subheadings**. Focus on:
+Highlight 4-6 notable implementation aspects using **bold subheadings**. Focus on:
 
 - Custom architectures or patterns you built
 - Complex features or workflows
@@ -133,8 +133,8 @@ A concise paragraph (2-3 sentences) summarizing:
 
 3. **Keep It Concise**
    - Introduction: 2-3 sentences
-   - Tech Stack: 4-6 bullets
-   - Implementation Details: 3-5 sections with 2-4 sub-bullets each
+   - Tech Stack: 5-12 bullets
+   - Implementation Details: 4-6 sections with 2-4 sub-bullets each
    - Outcome: 2-3 sentences
 
 4. **Focus on What Makes It Interesting**
@@ -197,7 +197,7 @@ Before submitting your write-up, verify:
 - [ ] Every technology mention has proper `<span class="tech" data-tag="...">` formatting
 - [ ] All `data-tag` values are lowercase and hyphenated
 - [ ] Tech Stack section explains why technologies were chosen
-- [ ] 3-5 Key Implementation Details with bold subheadings
+- [ ] 4-6 Key Implementation Details with bold subheadings
 - [ ] Outcome section summarizes impact and benefits
 - [ ] Writing is concise and engaging
 - [ ] No jargon without explanation in the introduction

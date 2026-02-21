@@ -32,13 +32,12 @@ export const Projects: CollectionConfig = {
         {
           name: 'technologies',
           type: 'relationship',
-          relationTo: 'technologies',
           hasMany: true,
+          relationTo: 'technologies',
         },
       ],
     },
     {
-      label: 'links',
       type: 'collapsible',
       fields: [
         {
@@ -51,9 +50,9 @@ export const Projects: CollectionConfig = {
         },
         { name: 'githubLink', type: 'text' },
       ],
+      label: 'links',
     },
     {
-      label: 'media',
       type: 'collapsible',
       fields: [
         {
@@ -64,11 +63,12 @@ export const Projects: CollectionConfig = {
         {
           name: 'images',
           type: 'upload',
+          hasMany: true,
           relationTo: 'media',
           unique: true,
-          hasMany: true,
         },
       ],
+      label: 'media',
     },
   ],
 }

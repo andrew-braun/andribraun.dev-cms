@@ -15,6 +15,7 @@ import { Media } from './collections/Media'
 import { Projects } from './collections/Projects'
 import { Tags } from './collections/Tags'
 import { Technologies } from './collections/Technologies'
+import { ThirdPartyAccess } from './collections/ThirdPartyAccess'
 import { Users } from './collections/Users'
 
 const filename = fileURLToPath(import.meta.url)
@@ -27,7 +28,7 @@ export default buildConfig({
     },
     user: Users.slug,
   },
-  collections: [Users, Media, Projects, Technologies, Tags],
+  collections: [Users, Media, Projects, Technologies, Tags, ThirdPartyAccess],
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URI || '',

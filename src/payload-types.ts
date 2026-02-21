@@ -64,6 +64,7 @@ export type SupportedTimezones =
 export interface Config {
   auth: {
     users: UserAuthOperations
+    'third-party-access': ThirdPartyAccessAuthOperations
   }
   blocks: {}
   collections: {
@@ -72,6 +73,7 @@ export interface Config {
     projects: Project
     technologies: Technology
     tags: Tag
+    'third-party-access': ThirdPartyAccess
     exports: Export
     imports: Import
     'payload-kv': PayloadKv
@@ -87,6 +89,7 @@ export interface Config {
     projects: ProjectsSelect<false> | ProjectsSelect<true>
     technologies: TechnologiesSelect<false> | TechnologiesSelect<true>
     tags: TagsSelect<false> | TagsSelect<true>
+    'third-party-access': ThirdPartyAccessSelect<false> | ThirdPartyAccessSelect<true>
     exports: ExportsSelect<false> | ExportsSelect<true>
     imports: ImportsSelect<false> | ImportsSelect<true>
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>
@@ -104,7 +107,7 @@ export interface Config {
   globals: {}
   globalsSelect: {}
   locale: null
-  user: User
+  user: User | ThirdPartyAccess
   jobs: {
     tasks: {
       createCollectionExport: TaskCreateCollectionExport
@@ -118,6 +121,24 @@ export interface Config {
   }
 }
 export interface UserAuthOperations {
+  forgotPassword: {
+    email: string
+    password: string
+  }
+  login: {
+    email: string
+    password: string
+  }
+  registerFirstUser: {
+    email: string
+    password: string
+  }
+  unlock: {
+    email: string
+    password: string
+  }
+}
+export interface ThirdPartyAccessAuthOperations {
   forgotPassword: {
     email: string
     password: string
@@ -248,6 +269,35 @@ export interface Tag {
   description?: string | null
   updatedAt: string
   createdAt: string
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "third-party-access".
+ */
+export interface ThirdPartyAccess {
+  id: number
+  name: string
+  updatedAt: string
+  createdAt: string
+  enableAPIKey?: boolean | null
+  apiKey?: string | null
+  apiKeyIndex?: string | null
+  email: string
+  resetPasswordToken?: string | null
+  resetPasswordExpiration?: string | null
+  salt?: string | null
+  hash?: string | null
+  loginAttempts?: number | null
+  lockUntil?: string | null
+  sessions?:
+    | {
+        id: string
+        createdAt?: string | null
+        expiresAt: string
+      }[]
+    | null
+  password?: string | null
+  collection: 'third-party-access'
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -459,11 +509,20 @@ export interface PayloadLockedDocument {
         relationTo: 'tags'
         value: number | Tag
       } | null)
+    | ({
+        relationTo: 'third-party-access'
+        value: number | ThirdPartyAccess
+      } | null)
   globalSlug?: string | null
-  user: {
-    relationTo: 'users'
-    value: number | User
-  }
+  user:
+    | {
+        relationTo: 'users'
+        value: number | User
+      }
+    | {
+        relationTo: 'third-party-access'
+        value: number | ThirdPartyAccess
+      }
   updatedAt: string
   createdAt: string
 }
@@ -473,10 +532,15 @@ export interface PayloadLockedDocument {
  */
 export interface PayloadPreference {
   id: number
-  user: {
-    relationTo: 'users'
-    value: number | User
-  }
+  user:
+    | {
+        relationTo: 'users'
+        value: number | User
+      }
+    | {
+        relationTo: 'third-party-access'
+        value: number | ThirdPartyAccess
+      }
   key?: string | null
   value?:
     | {
@@ -583,6 +647,32 @@ export interface TagsSelect<T extends boolean = true> {
   description?: T
   updatedAt?: T
   createdAt?: T
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "third-party-access_select".
+ */
+export interface ThirdPartyAccessSelect<T extends boolean = true> {
+  name?: T
+  updatedAt?: T
+  createdAt?: T
+  enableAPIKey?: T
+  apiKey?: T
+  apiKeyIndex?: T
+  email?: T
+  resetPasswordToken?: T
+  resetPasswordExpiration?: T
+  salt?: T
+  hash?: T
+  loginAttempts?: T
+  lockUntil?: T
+  sessions?:
+    | T
+    | {
+        id?: T
+        createdAt?: T
+        expiresAt?: T
+      }
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

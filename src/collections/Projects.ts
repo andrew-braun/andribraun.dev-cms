@@ -56,19 +56,74 @@ export const Projects: CollectionConfig = {
       type: 'collapsible',
       fields: [
         {
-          name: 'thumbnail',
-          type: 'upload',
-          relationTo: 'media',
-        },
-        {
-          name: 'images',
-          type: 'upload',
-          hasMany: true,
-          relationTo: 'media',
-          unique: true,
+          type: 'row',
+          fields: [
+            {
+              name: 'thumbnail',
+              type: 'upload',
+              admin: {
+                width: '50%',
+              },
+              relationTo: 'media',
+            },
+            {
+              name: 'images',
+              type: 'upload',
+              admin: {
+                width: '50%',
+              },
+              hasMany: true,
+              relationTo: 'media',
+              unique: true,
+            },
+          ],
         },
       ],
       label: 'media',
+    },
+    {
+      name: 'display',
+      type: 'group',
+      fields: [
+        {
+          type: 'row',
+          fields: [
+            {
+              name: 'featured',
+              type: 'checkbox',
+              admin: {
+                width: '10%',
+              },
+            },
+            {
+              name: 'hide',
+              type: 'checkbox',
+              admin: {
+                width: '10%',
+              },
+            },
+            {
+              name: 'order',
+              type: 'number',
+              admin: {
+                width: '20%',
+              },
+            },
+            {
+              name: 'card_type',
+              type: 'select',
+              admin: {
+                width: '40%',
+              },
+              defaultValue: 'visual',
+              options: [
+                { label: 'Visual', value: 'visual' },
+                { label: 'Text', value: 'text' },
+              ],
+            },
+          ],
+        },
+      ],
     },
   ],
 }

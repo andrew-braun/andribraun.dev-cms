@@ -11,6 +11,7 @@ import { buildConfig } from 'payload'
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
+import { Forms } from './collections/Forms'
 import { Media } from './collections/Media'
 import { Projects } from './collections/Projects'
 import { Tags } from './collections/Tags'
@@ -28,7 +29,7 @@ export default buildConfig({
     },
     user: Users.slug,
   },
-  collections: [Users, Media, Projects, Technologies, Tags, ThirdPartyAccess],
+  collections: [Forms, Users, Media, Projects, Technologies, Tags, ThirdPartyAccess],
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URI || '',

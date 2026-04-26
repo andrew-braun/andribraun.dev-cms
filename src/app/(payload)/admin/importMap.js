@@ -24,6 +24,8 @@ import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0
 import { ExportListMenuItem as ExportListMenuItem_cdf7e044479f899a31f804427d568b36 } from '@payloadcms/plugin-import-export/rsc'
 import { ImportListMenuItem as ImportListMenuItem_cdf7e044479f899a31f804427d568b36 } from '@payloadcms/plugin-import-export/rsc'
 import { default as default_c7532985b08d77c37d99b424948a88d6 } from '@/components/ExtractTechnologiesButton'
+import { FormatField as FormatField_cdf7e044479f899a31f804427d568b36 } from '@payloadcms/plugin-import-export/rsc'
+import { LimitField as LimitField_cdf7e044479f899a31f804427d568b36 } from '@payloadcms/plugin-import-export/rsc'
 import { Page as Page_cdf7e044479f899a31f804427d568b36 } from '@payloadcms/plugin-import-export/rsc'
 import { SortBy as SortBy_cdf7e044479f899a31f804427d568b36 } from '@payloadcms/plugin-import-export/rsc'
 import { SortOrder as SortOrder_cdf7e044479f899a31f804427d568b36 } from '@payloadcms/plugin-import-export/rsc'
@@ -38,6 +40,7 @@ import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc056
 import { ImportExportProvider as ImportExportProvider_cdf7e044479f899a31f804427d568b36 } from '@payloadcms/plugin-import-export/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
+/** @type import('payload').ImportMap */
 export const importMap = {
   '@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell':
     RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -90,6 +93,8 @@ export const importMap = {
   '@payloadcms/plugin-import-export/rsc#ImportListMenuItem':
     ImportListMenuItem_cdf7e044479f899a31f804427d568b36,
   '@/components/ExtractTechnologiesButton#default': default_c7532985b08d77c37d99b424948a88d6,
+  '@payloadcms/plugin-import-export/rsc#FormatField': FormatField_cdf7e044479f899a31f804427d568b36,
+  '@payloadcms/plugin-import-export/rsc#LimitField': LimitField_cdf7e044479f899a31f804427d568b36,
   '@payloadcms/plugin-import-export/rsc#Page': Page_cdf7e044479f899a31f804427d568b36,
   '@payloadcms/plugin-import-export/rsc#SortBy': SortBy_cdf7e044479f899a31f804427d568b36,
   '@payloadcms/plugin-import-export/rsc#SortOrder': SortOrder_cdf7e044479f899a31f804427d568b36,

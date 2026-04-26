@@ -68,6 +68,7 @@ export interface Config {
   }
   blocks: {}
   collections: {
+    forms: Form
     users: User
     media: Media
     projects: Project
@@ -84,6 +85,7 @@ export interface Config {
   }
   collectionsJoins: {}
   collectionsSelect: {
+    forms: FormsSelect<false> | FormsSelect<true>
     users: UsersSelect<false> | UsersSelect<true>
     media: MediaSelect<false> | MediaSelect<true>
     projects: ProjectsSelect<false> | ProjectsSelect<true>
@@ -158,6 +160,27 @@ export interface ThirdPartyAccessAuthOperations {
     email: string
     password: string
   }
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "forms".
+ */
+export interface Form {
+  id: number
+  form_name?: string | null
+  form_subject?: string | null
+  form_body?: string | null
+  sender_data?: {
+    name?: string | null
+    email?: string | null
+  }
+  metadata?: {
+    ip_address?: string | null
+    user_agent?: string | null
+    referrer?: string | null
+  }
+  updatedAt: string
+  createdAt: string
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -499,6 +522,10 @@ export interface PayloadLockedDocument {
   id: number
   document?:
     | ({
+        relationTo: 'forms'
+        value: number | Form
+      } | null)
+    | ({
         relationTo: 'users'
         value: number | User
       } | null)
@@ -573,6 +600,30 @@ export interface PayloadMigration {
   batch?: number | null
   updatedAt: string
   createdAt: string
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "forms_select".
+ */
+export interface FormsSelect<T extends boolean = true> {
+  form_name?: T
+  form_subject?: T
+  form_body?: T
+  sender_data?:
+    | T
+    | {
+        name?: T
+        email?: T
+      }
+  metadata?:
+    | T
+    | {
+        ip_address?: T
+        user_agent?: T
+        referrer?: T
+      }
+  updatedAt?: T
+  createdAt?: T
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -840,6 +891,7 @@ export interface TaskCreateCollectionExport {
     name: string
     batchSize?: number | null
     collectionSlug:
+      | 'forms'
       | 'users'
       | 'media'
       | 'projects'

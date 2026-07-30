@@ -47,8 +47,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
           secrets: |
-            database_uri=${{ secrets.DATABASE_URI_BUILD }}
-            payload_secret=${{ secrets.PAYLOAD_SECRET }}
+            DATABASE_URI=${{ secrets.DATABASE_URI_BUILD }}
+            PAYLOAD_SECRET=${{ secrets.PAYLOAD_SECRET }}
       - name: Trigger Dokploy Deployment
         run: |
           curl -X 'POST' \

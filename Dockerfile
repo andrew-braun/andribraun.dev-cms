@@ -41,10 +41,13 @@ COPY . .
 
 # Database connection is required during build for migrations
 # Use BuildKit secrets to securely pass sensitive data
-RUN --mount=type=secret,id=database_uri \
-    --mount=type=secret,id=payload_secret \
-    export DATABASE_URI=$(cat /run/secrets/database_uri) && \
-    export PAYLOAD_SECRET=$(cat /run/secrets/payload_secret) && \
+RUN --mount=type=secret,id=DATABASE_URI \
+    --mount=type=secret,id=PAYLOAD_SECRET \
+    if [ ! -s /run/secrets/DATABASE_URI ] || [ ! -s /run/secrets/PAYLOAD_SECRET ]; then \
+      echo "Missing build secrets: expected 'DATABASE_URI' and 'PAYLOAD_SECRET' to be mounted at build time." && exit 1; \
+    fi && \
+    export DATABASE_URI=$(cat /run/secrets/DATABASE_URI) && \
+    export PAYLOAD_SECRET=$(cat /run/secrets/PAYLOAD_SECRET) && \
     if [ -f yarn.lock ]; then yarn run build; \
     elif [ -f package-lock.json ]; then npm run build; \
     elif [ -f pnpm-lock.yaml ]; then pnpm run build; \

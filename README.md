@@ -20,6 +20,26 @@ The standout feature is intelligent technology extraction powered by Claude AI:
 
 Access it via the "Extract Technologies" button when editing any project in the admin panel.
 
+### Portfolio Ingest Pipeline
+
+Bulk-adds projects without hand-entering each one. Scans GitHub and a list of
+deployed URLs, generates write-ups and tech tags with Claude, and captures
+2560x1440 screenshots of the live sites with AI-generated alt text.
+
+```bash
+pnpm ingest discover     # scan GitHub / accept site URLs -> ingest/manifest.json
+pnpm ingest analyze      # gather repo context + probe the live site
+pnpm ingest writeup      # generate description_markdown
+pnpm ingest shots        # capture screenshots + alt text
+pnpm ingest publish      # upload media, create the project, extract technologies
+```
+
+Each stage writes to `ingest/work/<slug>/` for review; nothing reaches the
+database until `publish`, which creates projects hidden by default. Run
+`pnpm ingest` for the full command reference.
+
+**Reference**: [Ingest pipeline documentation](docs/ingest.md)
+
 ### Collections Architecture
 
 **Projects**: Portfolio projects with rich text descriptions, markdown support, and technology associations

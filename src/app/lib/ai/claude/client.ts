@@ -2,8 +2,15 @@ const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
 const DEFAULT_MODEL = 'claude-sonnet-4-5'
 
+export type ClaudeContentBlock =
+  | {
+      source: { data: string; media_type: string; type: 'base64' }
+      type: 'image'
+    }
+  | { text: string; type: 'text' }
+
 export interface ClaudeMessage {
-  content: string
+  content: ClaudeContentBlock[] | string
   role: 'assistant' | 'user'
 }
 
@@ -18,6 +25,8 @@ export interface JsonSchema {
 }
 
 export interface ClaudeRequestOptions {
+  /** Thinking depth / token spend. Only supported on Claude 4.5+ models. */
+  effort?: 'high' | 'low' | 'max' | 'medium' | 'xhigh'
   maxTokens?: number
   model?: string
   outputSchema?: JsonSchema
@@ -25,9 +34,15 @@ export interface ClaudeRequestOptions {
 }
 
 export interface ClaudeResponse {
+  /**
+   * Response blocks. Models with thinking enabled (on by default for Opus 5)
+   * emit a leading `thinking` block, so never index this directly — use
+   * {@link getTextContent}.
+   */
   content: Array<{
-    text: string
-    type: 'text'
+    text?: string
+    thinking?: string
+    type: string
   }>
   model: string
   stop_reason: string
@@ -52,7 +67,7 @@ export async function sendMessage(
   messages: ClaudeMessage[],
   options: ClaudeRequestOptions = {},
 ): Promise<ClaudeResponse> {
-  const { maxTokens = 1024, model = DEFAULT_MODEL, outputSchema, system } = options
+  const { effort, maxTokens = 1024, model = DEFAULT_MODEL, outputSchema, system } = options
 
   const body: Record<string, unknown> = {
     max_tokens: maxTokens,
@@ -64,13 +79,21 @@ export async function sendMessage(
     body.system = system
   }
 
+  const outputConfig: Record<string, unknown> = {}
+
   if (outputSchema) {
-    body.output_config = {
-      format: {
-        type: 'json_schema',
-        schema: outputSchema,
-      },
+    outputConfig.format = {
+      type: 'json_schema',
+      schema: outputSchema,
     }
+  }
+
+  if (effort) {
+    outputConfig.effort = effort
+  }
+
+  if (Object.keys(outputConfig).length > 0) {
+    body.output_config = outputConfig
   }
 
   const apiKey = process.env.CLAUDE_API_KEY
@@ -98,7 +121,9 @@ export async function sendMessage(
 }
 
 export function getTextContent(response: ClaudeResponse): string {
-  return response.content[0]?.text || ''
+  // Thinking-enabled models put a `thinking` block first, so select by type
+  // rather than position.
+  return response.content.find((block) => block.type === 'text')?.text || ''
 }
 
 export function parseJsonFromResponse<T>(response: ClaudeResponse, fallback: T): T {

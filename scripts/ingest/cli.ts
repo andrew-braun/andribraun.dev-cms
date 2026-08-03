@@ -8,7 +8,9 @@
 
 import { analyze } from './commands/analyze'
 import { discover } from './commands/discover'
+import { notes } from './commands/notes'
 import { publish } from './commands/publish'
+import { sheet } from './commands/sheet'
 import { shots } from './commands/shots'
 import { status } from './commands/status'
 import { writeup } from './commands/writeup'
@@ -18,7 +20,9 @@ import { IngestError, log } from './lib/log'
 const COMMANDS: Record<string, (args: ParsedArgs) => Promise<void>> = {
   analyze,
   discover,
+  notes,
   publish,
+  sheet,
   shots,
   status,
   writeup,
@@ -32,10 +36,14 @@ Portfolio ingest pipeline
 Commands
   discover   Scan GitHub and/or accept site URLs; seed ingest/manifest.json
   analyze    Gather repo context and probe the live site  → work/<slug>/context.{json,md}
+  notes      Scaffold hand-written background notes       → ingest/notes/<slug>.md
   writeup    Generate description_markdown with Claude    → work/<slug>/writeup.md
   shots      Capture 2560x1440 screenshots + alt text     → work/<slug>/shots/
-  publish    Upload media, create/update the project, extract technologies
+  sheet      Rebuild the manual-entry checklist           → work/<slug>/ENTER-ME.md
   status     Show the stage matrix for every entry
+
+  publish    Optional. Writes directly to the database DATABASE_URI points at.
+             Not needed for the copy-paste workflow.
 
 Passing one or more slugs limits a stage to those entries (and overrides "skip").
 
@@ -57,9 +65,17 @@ Flags
 Typical run
   pnpm ingest discover --urls=ingest/urls.txt
   $EDITOR ingest/manifest.json          # set titles, unskip what you want
-  pnpm ingest analyze && pnpm ingest writeup && pnpm ingest shots
-  $EDITOR ingest/work/<slug>/writeup.md # review before anything hits the CMS
-  pnpm ingest publish <slug>
+  pnpm ingest analyze
+  pnpm ingest notes                     # then fill in ingest/notes/<slug>.md
+  pnpm ingest writeup && pnpm ingest shots
+
+Notes are optional but matter most for sites with no repo, where the probe sees
+only rendered HTML. They are read fresh by writeup, so editing them needs no
+re-analyze — just: pnpm ingest writeup --force <slug>
+
+Then, per project, open ingest/work/<slug>/ENTER-ME.md and follow it:
+paste writeup.md into description_markdown, upload the PNGs from shots/ with
+the alt text listed on the sheet, save, then click "Extract Technologies".
 `
 
 async function main(): Promise<void> {

@@ -1,18 +1,21 @@
 # Portfolio ingest pipeline
 
-Bulk-adds portfolio projects: scans GitHub, generates write-ups and tech tags
-with Claude, captures correctly-sized screenshots of the deployed sites, and
-publishes the result into Payload.
+Prepares portfolio projects for entry: scans GitHub, generates write-ups with
+tech tags using Claude, and captures correctly-sized screenshots of the deployed
+sites with alt text.
 
-Every stage is independent, resumable, and writes to `ingest/work/<slug>/` for
-review. **Nothing touches the database until `publish`**, and `publish` creates
-projects hidden unless you pass `--visible`.
+**The pipeline produces files, not database rows.** Everything lands in the
+gitignored `ingest/work/<slug>/`, and each project gets an `ENTER-ME.md`
+checklist you follow to paste it into the Payload admin. No stage touches a
+database unless you explicitly run the optional `publish` command.
 
 ```text
-discover ──▶ analyze ──▶ writeup ──▶ shots ──▶ [you review] ──▶ publish
-   │            │           │          │                          │
-manifest    context.md  writeup.md  shots/*.png              projects + media
-                                    shots.json               + technologies
+discover ──▶ analyze ──▶ writeup ──▶ shots ──▶ ENTER-ME.md ──▶ you, in /admin
+   │            │   ▲       │          │
+manifest    context.md      │      shots/*.png
+                    │    writeup.md  shots.json
+             ingest/notes/<slug>.md
+             (optional, hand-written)
 ```
 
 ## Requirements
@@ -22,7 +25,7 @@ manifest    context.md  writeup.md  shots/*.png              projects + media
 | `gh auth login`                         | `discover` and `analyze` read repos via the API |
 | `CLAUDE_API_KEY` in .env                | `writeup` and screenshot alt text               |
 | `pnpm exec playwright install chromium` | `shots`                                         |
-| `DATABASE_URI`, `R2_*`                  | `publish` only                                  |
+| `DATABASE_URI`, `R2_*`                  | the optional `publish` command only             |
 
 ## Quick start
 
@@ -30,11 +33,24 @@ manifest    context.md  writeup.md  shots/*.png              projects + media
 pnpm ingest discover                     # scan your GitHub account
 $EDITOR ingest/manifest.json             # set titles, unskip what you want
 pnpm ingest analyze
+pnpm ingest notes                        # optional; then fill the files in
 pnpm ingest writeup
 pnpm ingest shots
-$EDITOR ingest/work/<slug>/writeup.md    # review before anything hits the CMS
-pnpm ingest publish <slug>
 ```
+
+Then, per project, open `ingest/work/<slug>/ENTER-ME.md` and work through it in
+the admin panel. It lists every field value, points at the write-up to paste
+into `description_markdown`, names which PNG to use as the thumbnail, and gives
+each image's alt text on its own line.
+
+Technologies stay automated: after saving the project, click the existing
+**Extract Technologies** button and it reads the markdown you just pasted,
+creates any missing technology records, and links them. On geobeermap that was
+23 technologies with no manual entry.
+
+The sheet is rewritten automatically whenever `writeup` or `shots` runs. Run
+`pnpm ingest sheet` yourself after hand-editing the manifest, so the field values
+on the sheet match what you changed.
 
 Run `pnpm ingest` with no arguments for the full command and flag reference.
 
@@ -68,25 +84,57 @@ appends newly-seen repos and URLs; it never overwrites your edits.
   "order": 3,
   "cardType": "visual", // "visual" | "text"
   "stages": { "analyzedAt": "...", "writeupAt": "...", "shotsAt": "..." },
-  "publishedTo": {
-    // written by `publish`, keyed by database
-    "localhost:5432/devsite": { "id": 2, "at": "..." },
-    "db.example.com:5432/andribraun": { "id": 14, "at": "..." },
-  },
 }
 ```
 
 `stages` timestamps are what make the pipeline resumable — a stage skips
 entries it has already completed. Pass `--force` to redo one.
 
-`publishedTo` records the Payload project ID per database, because IDs are
-per-database. See [Running locally, publishing to production](#running-locally-publishing-to-production).
+Entries also grow a `publishedTo` map if you ever use the optional
+[`publish` command](#the-optional-publish-command); the manual workflow never
+writes it.
+
+Editing `title` changes both the project title and the screenshot filenames, so
+set the real titles before running `shots`. Re-run `pnpm ingest sheet` after any
+manifest edit to refresh the checklists.
+
+## Background notes
+
+`analyze` can only report what it can see: files in a repo, and HTML served by a
+live site. For client work with no public repo — WordPress builds especially —
+that's a description of the finished site and nothing about your work on it.
+
+`ingest/notes/<slug>.md` is where you supply the rest.
+
+```bash
+pnpm ingest notes                    # scaffold files for every active entry
+pnpm ingest notes entity-inc         # or just one
+$EDITOR ingest/notes/entity-inc.md
+pnpm ingest writeup --force entity-inc
+```
+
+Each scaffold is a short list of prompts — what the project was, what you built,
+what was hard, anything measurable, anything to keep out. Answer them in prose,
+bullets, or fragments; delete the ones that don't apply. `notes` never
+overwrites a file that already exists, so re-running it is safe.
+
+The notes are placed at the **top** of the briefing and marked as authoritative,
+so where they contradict the scraped evidence, they win. A leading `# Title`,
+the HTML comments, and any prompts you left unanswered are stripped before
+sending. Leave a file untouched and it's ignored entirely.
+
+`writeup` re-reads the notes each run rather than using the copy captured in
+`context.json`, so editing them takes effect without re-running `analyze` —
+just `pnpm ingest writeup --force <slug>`.
+
+Unlike `work/`, `ingest/notes/` is **tracked in git**. Everything in `work/` can
+be regenerated; your notes can't.
 
 ### Repos with no deployed site
 
 `discover` adds repos without a homepage URL as `skip: true`, because there is
 nothing to screenshot. To include one, set `skip: false` and either add a
-`liveUrl` or leave it off — the project will publish with a write-up and no
+`liveUrl` or leave it off — you'll get a write-up and a checklist with no
 images. Use `--all` to add everything unskipped instead.
 
 ## Stage notes
@@ -100,13 +148,17 @@ be reached from either direction.
 files that reveal the stack (README, package manifests, framework configs, CI
 workflows, schema files), then probes the live site for its title, meta
 description, framework fingerprints, and navigation links. No clone is
-performed. Writes `context.json` and the human-readable `context.md`.
+performed. Writes `context.json` and the human-readable `context.md`, folding in
+`ingest/notes/<slug>.md` when one exists.
+
+**`notes`** — scaffolds `ingest/notes/<slug>.md` for entries that don't have one.
+See [Background notes](#background-notes).
 
 **`writeup`** — sends `context.md` to Claude with
 `ai/project.summary-instructions.md` as the system prompt, so the output follows
 your existing format, including the `<span class="tech" data-tag="...">` tags.
-The result lands in `writeup.md` as plain markdown — edit it freely; `publish`
-reads whatever the file contains at publish time.
+The result lands in `writeup.md` as plain markdown — edit it freely before
+pasting it in; the checklist always points at the current file.
 
 **`shots`** — renders each target at a 1280×720 viewport with a 2× device scale
 factor, producing 2560×1440 PNGs that match your existing media. Before each
@@ -118,59 +170,67 @@ Targets come from `screenshots` in the manifest when set; otherwise the homepage
 plus same-origin nav routes discovered during `analyze`, capped at `maxShots`
 (default 5). Pages behind a login can't be captured — pin public URLs instead.
 
-**`publish`** — uploads each PNG to the `media` collection with its alt text,
-creates or updates the project, then runs the existing
-`extractTechnologiesFromProject` service to create and link `technologies`
-records. It prints the target database first, and re-running against that same
-database updates the recorded project rather than creating a duplicate — though
-it does upload a fresh set of images each time.
+**`sheet`** — regenerates `ENTER-ME.md` from whatever the other stages have
+produced. `writeup` and `shots` call it automatically; run it directly after
+editing the manifest so the field values on the sheet stay accurate.
 
-Flags: `--dry-run` (report only), `--visible` (skip the hidden default),
-`--no-tech` (skip technology extraction).
+**`status`** — stage matrix for every entry. The `ready` column means the
+`ENTER-ME.md` checklist exists; whether you've actually typed a project into the
+admin panel is something only you know, so the pipeline doesn't guess.
 
-## Running locally, publishing to production
+## Manual entry, step by step
 
-**You don't need export/import.** Only `publish` touches a database — `discover`,
-`analyze`, `writeup`, `shots`, and `status` work entirely on local files. So the
-expensive, reviewable work happens locally, and you point only the final step at
-production:
+For each project, open `ingest/work/<slug>/ENTER-ME.md` and follow it against
+`/admin/collections/projects/create`:
 
-```bash
-pnpm ingest analyze && pnpm ingest writeup && pnpm ingest shots   # no DB at all
-# ...review ingest/work/<slug>/writeup.md and the PNGs...
-DATABASE_URI="postgresql://…prod…" pnpm ingest publish geobeermap
-```
+1. **Fields** — the sheet lists `title`, the three links, and the `display`
+   values as a table. Copy them across.
+2. **description_markdown** — paste the whole of `writeup.md`. Leave the
+   rich-text `description` field empty; your existing projects use
+   `description_markdown` only. The sheet includes a one-line `xclip`/`pbcopy`
+   command if you'd rather not open the file.
+3. **Media** — upload the PNGs from `shots/`. Each one needs `alt` text, and the
+   sheet prints it on its own line under the matching filename. Set `thumbnail`
+   to the first image and add all of them to `images`.
+4. **Save**, then click **Extract Technologies**. Nothing to type — it parses
+   the markdown you just pasted, creates missing technology records, and links
+   them to the project.
 
-An inline `DATABASE_URI` wins over the one in `.env` (dotenv does not overwrite
-variables that are already set), so nothing needs editing to switch targets.
+Leave `display.hide` ticked while you review, then untick it to go live.
 
-Two details make this safe:
+## The optional `publish` command
 
-- **`publishedTo` is keyed by database** (`host:port/name`). Publishing to dev
-  records the dev project ID under the dev key; publishing to prod creates a
-  _separate_ project there. A dev ID is never used to update a prod row.
-- **`publish` prints its target first**, and `status` shows the publish column
-  for the current target plus an `also in …` note for any other database an
-  entry has been published to.
+`publish` does all of the above automatically against whatever database
+`DATABASE_URI` points at. **It is not part of the normal workflow** — the
+copy-paste route above is the intended one, and this exists for the day you want
+to batch a large number of projects and are comfortable pointing the script at a
+real database.
+
+If you do use it, note:
+
+- It prints its target database before doing anything, and `--dry-run` reports
+  without writing.
+- Projects are created with `display.hide` set unless you pass `--visible`.
+- `publishedTo` in the manifest is keyed by database (`host:port/name`), so a
+  project ID recorded against dev is never used to update a row in prod, and
+  `status` notes which databases an entry has been published to.
+- An inline `DATABASE_URI=… pnpm ingest publish` overrides `.env`, since dotenv
+  doesn't overwrite variables that are already set.
+
+Flags: `--dry-run`, `--visible`, `--no-tech` (skip technology extraction).
 
 ### Why not export/import
 
-The `@payloadcms/plugin-import-export` route is available in the admin panel,
-but it works poorly for this pipeline because projects are mostly
-_relationships_: `images` points at `media` IDs and `metadata.technologies`
-points at `technologies` IDs. Those IDs are per-database, and the media rows and
-technology records wouldn't exist in the target instance at all — so an
-imported project would arrive with broken image and technology links that you'd
-have to repair by hand.
+Moving projects between databases via `@payloadcms/plugin-import-export` doesn't
+work well here, because projects are mostly _relationships_: `images` points at
+`media` IDs and `metadata.technologies` points at `technologies` IDs. Those IDs
+are per-database, and the media rows and technology records don't exist in the
+target instance at all — so an imported project arrives with broken image and
+technology links to repair by hand.
 
-Publishing directly sidesteps this: `publish` creates the media rows and runs
-technology extraction against the target database, so every relationship is
-correct by construction. It also uploads to the same R2 bucket either way,
-since `R2_BUCKET_NAME` is shared.
-
-Export/import is still the right tool for a one-off backup or for moving
-already-correct data between two instances that share IDs — just not for
-promoting freshly ingested projects.
+Entering a project through the admin panel avoids this completely: uploading an
+image creates the media row, and **Extract Technologies** creates and links the
+technology records, all against the database you're actually looking at.
 
 ## Costs and models
 
@@ -181,5 +241,7 @@ are the main levers if you're batching a lot of projects at once.
 
 ## Working files
 
-`ingest/work/` is gitignored. `ingest/manifest.json` and `ingest/urls.txt` are
-tracked, so the record of what you've ingested lives in the repo.
+`ingest/work/` is gitignored — everything in it is regenerable.
+`ingest/manifest.json`, `ingest/urls.txt`, and `ingest/notes/` are tracked, so
+the record of what you've ingested, and everything you wrote by hand, lives in
+the repo.

@@ -100,6 +100,12 @@ export interface RepoContext {
 
 export interface EntryContext {
   gatheredAt: string
+  /**
+   * Contents of `ingest/notes/<slug>.md`, if present. First-hand background the
+   * probe and repo scan can't reveal — what the brief was, what you actually
+   * built. Weighted above the scraped evidence in the briefing.
+   */
+  notes?: string
   repo?: RepoContext
   site?: SiteProbe
   slug: string

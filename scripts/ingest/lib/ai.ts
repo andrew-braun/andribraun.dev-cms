@@ -23,6 +23,22 @@ const MAX_CONTEXT_CHARS = 180_000
 export function renderContext(context: EntryContext): string {
   const parts: string[] = [`# Project: ${context.title}`, '']
 
+  // Notes come first and are framed as authoritative: they're first-hand, while
+  // everything below is inference from scraped HTML and repo files.
+  if (context.notes) {
+    parts.push(
+      "## Developer's notes",
+      '',
+      'Written by the developer who built this project. Treat as authoritative:',
+      'where it conflicts with the scraped evidence below, this wins. It may name',
+      'work that leaves no trace in the served HTML — build these details into the',
+      'write-up rather than restricting yourself to what the probe found.',
+      '',
+      context.notes,
+      '',
+    )
+  }
+
   if (context.site) {
     const site = context.site
     parts.push('## Deployed site', '')

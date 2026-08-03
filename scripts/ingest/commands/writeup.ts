@@ -6,7 +6,9 @@ import { generateWriteup } from '../lib/ai'
 import { hasFlag, type ParsedArgs } from '../lib/args'
 import { log } from '../lib/log'
 import { loadManifest, readJson, selectEntries, updateEntry } from '../lib/manifest'
-import { contextPath, rel, writeupPath } from '../lib/paths'
+import { readNotes } from '../lib/notes'
+import { contextPath, notesPath, rel, writeupPath } from '../lib/paths'
+import { writeSheet } from '../lib/sheet'
 
 /**
  * Turns each analyzed context bundle into a `description_markdown` body using
@@ -42,14 +44,22 @@ export async function writeup(args: ParsedArgs): Promise<void> {
 
     log.step(`Writing up ${entry.slug}`)
 
+    // Re-read the notes rather than trusting the copy in context.json, so
+    // editing them takes effect without re-running analyze.
+    const notes = await readNotes(entry.slug)
+    if (notes) {
+      log.detail(`using notes from ${rel(notesPath(entry.slug))}`)
+    }
+
     try {
       // Use the manifest title, which the user may have corrected since analyze.
-      const markdown = await generateWriteup({ ...context, title: entry.title })
+      const markdown = await generateWriteup({ ...context, notes, title: entry.title })
       await fs.writeFile(writeupPath(entry.slug), `${markdown}\n`, 'utf8')
 
       await updateEntry(entry.slug, (target) => {
         target.stages.writeupAt = new Date().toISOString()
       })
+      await writeSheet(entry)
 
       const words = markdown.split(/\s+/).length
       const tags = new Set([...markdown.matchAll(/data-tag="([^"]+)"/g)].map((match) => match[1]))

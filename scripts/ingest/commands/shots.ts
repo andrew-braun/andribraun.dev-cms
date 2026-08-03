@@ -16,6 +16,7 @@ import {
   writeJson,
 } from '../lib/manifest'
 import { contextPath, rel, shotsDir, shotsManifestPath } from '../lib/paths'
+import { writeSheet } from '../lib/sheet'
 
 /**
  * Viewport is half the output size and the device scale factor doubles it, so
@@ -139,6 +140,7 @@ export async function shots(args: ParsedArgs): Promise<void> {
       await updateEntry(entry.slug, (target) => {
         target.stages.shotsAt = new Date().toISOString()
       })
+      await writeSheet(entry)
       log.info(`${captured.length} screenshots → ${rel(outDir)}`)
     }
   } finally {
@@ -146,7 +148,7 @@ export async function shots(args: ParsedArgs): Promise<void> {
   }
 
   log.info('')
-  log.detail('Review the PNGs and shots.json, then run: pnpm ingest publish <slug>')
+  log.detail('Each project now has an ENTER-ME.md checklist in its work directory.')
 }
 
 /** Navigates, waits for the page to stop moving, and clears overlays. */

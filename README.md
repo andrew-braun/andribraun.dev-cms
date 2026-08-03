@@ -22,21 +22,30 @@ Access it via the "Extract Technologies" button when editing any project in the 
 
 ### Portfolio Ingest Pipeline
 
-Bulk-adds projects without hand-entering each one. Scans GitHub and a list of
-deployed URLs, generates write-ups and tech tags with Claude, and captures
-2560x1440 screenshots of the live sites with AI-generated alt text.
+Prepares new portfolio projects so they can be entered quickly. Scans GitHub and
+a list of deployed URLs, generates write-ups and tech tags with Claude, and
+captures 2560x1440 screenshots of the live sites with AI-generated alt text.
 
 ```bash
 pnpm ingest discover     # scan GitHub / accept site URLs -> ingest/manifest.json
 pnpm ingest analyze      # gather repo context + probe the live site
+pnpm ingest notes        # optional: hand-written background -> ingest/notes/
 pnpm ingest writeup      # generate description_markdown
 pnpm ingest shots        # capture screenshots + alt text
-pnpm ingest publish      # upload media, create the project, extract technologies
 ```
 
-Each stage writes to `ingest/work/<slug>/` for review; nothing reaches the
-database until `publish`, which creates projects hidden by default. Run
-`pnpm ingest` for the full command reference.
+For client work with no public repo, `ingest/notes/<slug>.md` lets you supply
+background the scan can't see — what the brief was, what you actually built.
+Notes are treated as authoritative and outrank the scraped evidence.
+
+Output lands in the gitignored `ingest/work/<slug>/`, and each project gets an
+`ENTER-ME.md` checklist listing every field value, the write-up to paste, and
+each screenshot's alt text — so entering it in the admin panel is copy, paste,
+upload, then click **Extract Technologies**.
+
+No stage touches the database. An optional `publish` command can write directly
+to whichever database `DATABASE_URI` points at, but it isn't part of the normal
+workflow. Run `pnpm ingest` for the full command reference.
 
 **Reference**: [Ingest pipeline documentation](docs/ingest.md)
 

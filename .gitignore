@@ -54,4 +54,4 @@ node_modules/
 
 # Ingest pipeline working files (screenshots, contexts, generated write-ups).
 # ingest/manifest.json and ingest/urls.txt are intentionally tracked.
-/ingest/work
+/ingest

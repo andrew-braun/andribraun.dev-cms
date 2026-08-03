@@ -8,7 +8,8 @@ import { hasFlag, type ParsedArgs } from '../lib/args'
 import { assertGhReady, gatherRepoContext } from '../lib/github'
 import { log } from '../lib/log'
 import { loadManifest, selectEntries, updateEntry, writeJson } from '../lib/manifest'
-import { contextPath, entryDir, rel } from '../lib/paths'
+import { readNotes } from '../lib/notes'
+import { contextPath, entryDir, notesPath, rel } from '../lib/paths'
 import { probeSite } from '../lib/site'
 
 /**
@@ -44,15 +45,22 @@ export async function analyze(args: ParsedArgs): Promise<void> {
 
     log.step(`Analyzing ${entry.slug}`)
 
-    if (!entry.repo && !entry.liveUrl) {
-      log.warn(`${entry.slug}: no repo and no liveUrl — nothing to analyze. Skipping.`)
+    const notes = await readNotes(entry.slug)
+
+    if (!entry.repo && !entry.liveUrl && !notes) {
+      log.warn(`${entry.slug}: no repo, liveUrl, or notes — nothing to analyze. Skipping.`)
       continue
     }
 
     const context: EntryContext = {
       slug: entry.slug,
       gatheredAt: new Date().toISOString(),
+      notes,
       title: entry.title,
+    }
+
+    if (notes) {
+      log.info(`notes ${rel(notesPath(entry.slug))}: ${notes.length} chars`)
     }
 
     if (entry.repo) {

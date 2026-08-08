@@ -2,18 +2,20 @@ import fs from 'fs/promises'
 
 import type { EntryContext } from '../lib/types'
 
-import { generateWriteup } from '../lib/ai'
+import { generateCaseStudy, generateWriteup } from '../lib/ai'
 import { hasFlag, type ParsedArgs } from '../lib/args'
+import { emptyCaseStudyStub } from '../lib/caseStudy'
 import { log } from '../lib/log'
 import { loadManifest, readJson, selectEntries, updateEntry } from '../lib/manifest'
 import { readNotes } from '../lib/notes'
-import { contextPath, notesPath, rel, writeupPath } from '../lib/paths'
+import { caseStudyPath, contextPath, notesPath, rel, writeupPath } from '../lib/paths'
 import { writeSheet } from '../lib/sheet'
 
 /**
  * Turns each analyzed context bundle into a `description_markdown` body using
- * `ai/project.summary-instructions.md` as the system prompt. Output lands in
- * `ingest/work/<slug>/writeup.md` for review — nothing reaches the CMS here.
+ * `ai/project.summary-instructions.md` as the system prompt, plus a structured
+ * `case-study.json` sidecar for the case-study CMS fields. Outputs land in
+ * `ingest/work/<slug>/` for review — nothing reaches the CMS here.
  */
 export async function writeup(args: ParsedArgs): Promise<void> {
   if (!process.env.CLAUDE_API_KEY) {
@@ -53,8 +55,24 @@ export async function writeup(args: ParsedArgs): Promise<void> {
 
     try {
       // Use the manifest title, which the user may have corrected since analyze.
-      const markdown = await generateWriteup({ ...context, notes, title: entry.title })
+      const briefing = { ...context, notes, title: entry.title }
+      const markdown = await generateWriteup(briefing)
       await fs.writeFile(writeupPath(entry.slug), `${markdown}\n`, 'utf8')
+
+      let caseStudy
+      try {
+        caseStudy = await generateCaseStudy(briefing)
+      } catch (error) {
+        log.warn(
+          `${entry.slug}: case-study generation failed (${error instanceof Error ? error.message : String(error)}) — writing stub`,
+        )
+        caseStudy = emptyCaseStudyStub()
+      }
+      await fs.writeFile(
+        caseStudyPath(entry.slug),
+        `${JSON.stringify(caseStudy, null, 2)}\n`,
+        'utf8',
+      )
 
       await updateEntry(entry.slug, (target) => {
         target.stages.writeupAt = new Date().toISOString()
@@ -64,7 +82,10 @@ export async function writeup(args: ParsedArgs): Promise<void> {
       const words = markdown.split(/\s+/).length
       const tags = new Set([...markdown.matchAll(/data-tag="([^"]+)"/g)].map((match) => match[1]))
         .size
-      log.ok(`${entry.slug} → ${rel(writeupPath(entry.slug))} (${words} words, ${tags} tech tags)`)
+      const review = caseStudy.needsReview.length > 0 ? caseStudy.needsReview.join(',') : 'none'
+      log.ok(
+        `${entry.slug} → ${rel(writeupPath(entry.slug))} (${words} words, ${tags} tech tags); case-study needsReview=${review}`,
+      )
     } catch (error) {
       log.error(`${entry.slug}: ${error instanceof Error ? error.message : String(error)}`)
     }

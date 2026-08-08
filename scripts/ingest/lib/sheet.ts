@@ -1,10 +1,12 @@
 import fs from 'fs/promises'
 import path from 'path'
 
+import type { CaseStudySidecar } from './caseStudy'
 import type { CapturedShot, ManifestEntry } from './types'
 
+import { CASE_STUDY_FIELD_KEYS } from './caseStudy'
 import { readJson } from './manifest'
-import { entryDir, rel, shotsDir, shotsManifestPath, writeupPath } from './paths'
+import { caseStudyPath, entryDir, rel, shotsDir, shotsManifestPath, writeupPath } from './paths'
 
 /**
  * Writes `ingest/work/<slug>/ENTER-ME.md` — a single checklist for entering the
@@ -25,6 +27,8 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
     return null
   }
 
+  const caseStudy = await readJson<CaseStudySidecar>(caseStudyPath(entry.slug))
+
   const lines: string[] = [
     `# ${entry.title}`,
     '',
@@ -36,6 +40,7 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
     '| Field | Value |',
     '| --- | --- |',
     `| title | \`${entry.title}\` |`,
+    `| slug | \`${entry.slug}\` |`,
     `| links → liveLink | ${code(entry.liveUrl)} |`,
     `| links → githubLink | ${code(entry.githubLink)} |`,
     `| links → snapshotLink | ${code(entry.snapshotLink)} |`,
@@ -43,6 +48,7 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
     `| display → featured | \`${entry.featured ?? false}\` |`,
     `| display → order | ${code(entry.order === undefined ? undefined : String(entry.order))} |`,
     '',
+    ...renderCaseStudySection(entry.slug, caseStudy),
   ]
 
   if (hasWriteup) {
@@ -98,6 +104,68 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(target, `${lines.join('\n')}\n`, 'utf8')
   return target
+}
+
+/** Renders the Case study checklist section for ENTER-ME.md. */
+export function renderCaseStudySection(slug: string, caseStudy: CaseStudySidecar | null): string[] {
+  const lines: string[] = [
+    '## Case study',
+    '',
+    `| slug | \`${slug}\` |`,
+    '',
+    'Copy values from **[case-study.json](./case-study.json)** (or the table below) into the',
+    'matching Project fields. `slug` is required and unique.',
+    '',
+  ]
+
+  if (!caseStudy) {
+    lines.push(
+      '_No case-study.json yet — run `pnpm ingest writeup` (or fill these in admin)._',
+      '',
+      '**Needs review:** ' + CASE_STUDY_FIELD_KEYS.map((k) => `\`${k}\``).join(', '),
+      '',
+    )
+    return lines
+  }
+
+  lines.push('| Field | Value |', '| --- | --- |')
+  lines.push(`| clientName | ${code(caseStudy.clientName)} |`)
+  lines.push(`| status | ${code(caseStudy.status)} |`)
+  lines.push(
+    `| businessChallenge | ${caseStudy.businessChallenge ? 'see case-study.json / block below' : '—'} |`,
+  )
+  lines.push(
+    `| contributionHighlights | ${caseStudy.contributionHighlights?.length ?? 0} item(s) |`,
+  )
+  lines.push(`| outcomes | ${caseStudy.outcomes?.length ?? 0} item(s) |`)
+  lines.push('')
+
+  if (caseStudy.businessChallenge) {
+    lines.push('### businessChallenge', '', caseStudy.businessChallenge, '')
+  }
+
+  if (caseStudy.contributionHighlights?.length) {
+    lines.push('### contributionHighlights', '')
+    for (const row of caseStudy.contributionHighlights) {
+      lines.push(`- ${row.statement}`)
+    }
+    lines.push('')
+  }
+
+  if (caseStudy.outcomes?.length) {
+    lines.push('### outcomes', '')
+    for (const row of caseStudy.outcomes) {
+      lines.push(row.metric ? `- **${row.statement}** — ${row.metric}` : `- ${row.statement}`)
+    }
+    lines.push('')
+  }
+
+  const review =
+    caseStudy.needsReview.length > 0
+      ? caseStudy.needsReview.map((k) => `\`${k}\``).join(', ')
+      : '_none_'
+  lines.push(`**Needs review:** ${review}`, '')
+  return lines
 }
 
 function code(value?: string): string {

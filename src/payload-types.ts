@@ -232,6 +232,23 @@ export interface Media {
 export interface Project {
   id: number
   title?: string | null
+  slug: string
+  clientName?: string | null
+  status?: ('live' | 'ongoing' | 'completed' | 'archived') | null
+  businessChallenge?: string | null
+  contributionHighlights?:
+    | {
+        statement: string
+        id?: string | null
+      }[]
+    | null
+  outcomes?:
+    | {
+        statement: string
+        metric?: string | null
+        id?: string | null
+      }[]
+    | null
   description?: {
     root: {
       type: string
@@ -670,6 +687,23 @@ export interface MediaSelect<T extends boolean = true> {
  */
 export interface ProjectsSelect<T extends boolean = true> {
   title?: T
+  slug?: T
+  clientName?: T
+  status?: T
+  businessChallenge?: T
+  contributionHighlights?:
+    | T
+    | {
+        statement?: T
+        id?: T
+      }
+  outcomes?:
+    | T
+    | {
+        statement?: T
+        metric?: T
+        id?: T
+      }
   description?: T
   description_markdown?: T
   metadata?:

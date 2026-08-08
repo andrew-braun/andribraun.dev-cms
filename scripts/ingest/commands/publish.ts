@@ -2,14 +2,16 @@ import { extractTechnologiesFromProject } from '@/services/technologyExtraction'
 import configPromise from '@payload-config'
 import fs from 'fs/promises'
 import path from 'path'
-import { getPayload, type RequiredDataFromCollectionSlug } from 'payload'
+import { getPayload } from 'payload'
 
-import type { CapturedShot, ManifestEntry } from '../lib/types'
+import type { CaseStudySidecar } from '../lib/caseStudy'
+import type { CapturedShot } from '../lib/types'
 
 import { hasFlag, type ParsedArgs } from '../lib/args'
 import { log } from '../lib/log'
 import { loadManifest, readJson, selectEntries, updateEntry } from '../lib/manifest'
-import { shotsDir, shotsManifestPath, writeupPath } from '../lib/paths'
+import { caseStudyPath, shotsDir, shotsManifestPath, writeupPath } from '../lib/paths'
+import { buildProjectData } from '../lib/projectData'
 import { currentTarget } from '../lib/target'
 
 /**
@@ -49,9 +51,12 @@ export async function publish(args: ParsedArgs): Promise<void> {
     for (const entry of ready) {
       const shots = (await readJson<CapturedShot[]>(shotsManifestPath(entry.slug))) ?? []
       const markdown = await fs.readFile(writeupPath(entry.slug), 'utf8')
+      const caseStudy = await readJson<CaseStudySidecar>(caseStudyPath(entry.slug))
       const existing = entry.publishedTo?.[target]
       const action = existing ? `update #${existing.id}` : 'create'
-      log.ok(`${entry.slug}: ${action}, ${markdown.length} chars, ${shots.length} images`)
+      log.ok(
+        `${entry.slug}: ${action}, ${markdown.length} chars, ${shots.length} images, case-study=${caseStudy ? 'yes' : 'missing'}`,
+      )
     }
     return
   }
@@ -64,6 +69,10 @@ export async function publish(args: ParsedArgs): Promise<void> {
     try {
       const markdown = (await fs.readFile(writeupPath(entry.slug), 'utf8')).trim()
       const shots = (await readJson<CapturedShot[]>(shotsManifestPath(entry.slug))) ?? []
+      const caseStudy = await readJson<CaseStudySidecar>(caseStudyPath(entry.slug))
+      if (!caseStudy) {
+        log.warn(`${entry.slug}: case-study.json missing — publishing without case-study fields`)
+      }
 
       const mediaIds: number[] = []
       for (const shot of shots) {
@@ -84,7 +93,7 @@ export async function publish(args: ParsedArgs): Promise<void> {
         log.detail(`uploaded ${shot.file} (media #${media.id})`)
       }
 
-      const data = buildProjectData(entry, markdown, mediaIds, visible)
+      const data = buildProjectData(entry, markdown, mediaIds, visible, caseStudy)
 
       const existing = entry.publishedTo?.[target]
 
@@ -135,27 +144,4 @@ export async function publish(args: ParsedArgs): Promise<void> {
 
   // The Payload/Postgres pool keeps the event loop alive otherwise.
   process.exit(process.exitCode ?? 0)
-}
-
-function buildProjectData(
-  entry: ManifestEntry,
-  markdown: string,
-  mediaIds: number[],
-  visible: boolean,
-): RequiredDataFromCollectionSlug<'projects'> {
-  return {
-    description_markdown: markdown,
-    display: {
-      card_type: entry.cardType ?? 'visual',
-      featured: entry.featured ?? false,
-      hide: !visible,
-      order: entry.order,
-    },
-    githubLink: entry.githubLink,
-    images: mediaIds,
-    liveLink: entry.liveUrl,
-    snapshotLink: entry.snapshotLink,
-    thumbnail: mediaIds[0],
-    title: entry.title,
-  }
 }

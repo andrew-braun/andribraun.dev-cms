@@ -14,6 +14,7 @@ discover ──▶ analyze ──▶ writeup ──▶ shots ──▶ ENTER-ME.
    │            │   ▲       │          │
 manifest    context.md      │      shots/*.png
                     │    writeup.md  shots.json
+                    │    case-study.json
              ingest/notes/<slug>.md
              (optional, hand-written)
 ```
@@ -39,9 +40,11 @@ pnpm ingest shots
 ```
 
 Then, per project, open `ingest/work/<slug>/ENTER-ME.md` and work through it in
-the admin panel. It lists every field value, points at the write-up to paste
-into `description_markdown`, names which PNG to use as the thumbnail, and gives
-each image's alt text on its own line.
+the admin panel. It lists every field value (including `slug` and case-study
+fields), points at the write-up to paste into `description_markdown`, names which
+PNG to use as the thumbnail, and gives each image's alt text on its own line.
+Case-study values that the model was unsure about are listed under
+**Needs review**.
 
 Technologies stay automated: after saving the project, click the existing
 **Extract Technologies** button and it reads the markdown you just pasted,
@@ -154,11 +157,18 @@ performed. Writes `context.json` and the human-readable `context.md`, folding in
 **`notes`** — scaffolds `ingest/notes/<slug>.md` for entries that don't have one.
 See [Background notes](#background-notes).
 
-**`writeup`** — sends `context.md` to Claude with
-`ai/project.summary-instructions.md` as the system prompt, so the output follows
-your existing format, including the `<span class="tech" data-tag="...">` tags.
-The result lands in `writeup.md` as plain markdown — edit it freely before
-pasting it in; the checklist always points at the current file.
+**`writeup`** — sends the context briefing to Claude twice:
+
+1. With `ai/project.summary-instructions.md` → `writeup.md` (technical
+   `description_markdown`, including `<span class="tech" data-tag="...">` tags).
+2. With `ai/project.case-study-instructions.md` → `case-study.json` (structured
+   `clientName`, `businessChallenge`, `contributionHighlights`, `outcomes`,
+   `status`, plus a `needsReview` list).
+
+Edit either file freely before pasting into admin; the checklist always points
+at the current files. `--force` regenerates both. If case-study generation
+fails, a stub sidecar with every field flagged for review is written so the
+write-up stage can still succeed.
 
 **`shots`** — renders each target at a 1280×720 viewport with a 2× device scale
 factor, producing 2560×1440 PNGs that match your existing media. Before each
@@ -183,16 +193,20 @@ admin panel is something only you know, so the pipeline doesn't guess.
 For each project, open `ingest/work/<slug>/ENTER-ME.md` and follow it against
 `/admin/collections/projects/create`:
 
-1. **Fields** — the sheet lists `title`, the three links, and the `display`
-   values as a table. Copy them across.
-2. **description_markdown** — paste the whole of `writeup.md`. Leave the
+1. **Fields** — the sheet lists `title`, `slug`, the three links, and the
+   `display` values as a table. Copy them across. `slug` is required and unique.
+2. **Case study** — copy from `case-study.json` / the sheet section into
+   `clientName`, `businessChallenge`, `contributionHighlights`, `outcomes`, and
+   `status`. Fill anything listed under **Needs review** yourself. (Testimonials
+   are not wired yet.)
+3. **description_markdown** — paste the whole of `writeup.md`. Leave the
    rich-text `description` field empty; your existing projects use
    `description_markdown` only. The sheet includes a one-line `xclip`/`pbcopy`
    command if you'd rather not open the file.
-3. **Media** — upload the PNGs from `shots/`. Each one needs `alt` text, and the
+4. **Media** — upload the PNGs from `shots/`. Each one needs `alt` text, and the
    sheet prints it on its own line under the matching filename. Set `thumbnail`
    to the first image and add all of them to `images`.
-4. **Save**, then click **Extract Technologies**. Nothing to type — it parses
+5. **Save**, then click **Extract Technologies**. Nothing to type — it parses
    the markdown you just pasted, creates missing technology records, and links
    them to the project.
 
@@ -210,6 +224,9 @@ If you do use it, note:
 
 - It prints its target database before doing anything, and `--dry-run` reports
   without writing.
+- It maps manifest `slug` onto the Project `slug`, and maps `case-study.json`
+  into the case-study fields when present. A missing sidecar still publishes
+  the write-up, links, and media (with a warning).
 - Projects are created with `display.hide` set unless you pass `--visible`.
 - `publishedTo` in the manifest is keyed by database (`host:port/name`), so a
   project ID recorded against dev is never used to update a row in prod, and

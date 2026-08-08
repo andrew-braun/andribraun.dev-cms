@@ -17,6 +17,9 @@ export const NOTES_DIR = path.join(INGEST_DIR, 'notes')
 /** Instructions the writeup stage feeds to Claude as its system prompt. */
 export const WRITEUP_INSTRUCTIONS_PATH = path.join(ROOT, 'ai/project.summary-instructions.md')
 
+/** Instructions for the case-study sidecar JSON generated alongside the write-up. */
+export const CASE_STUDY_INSTRUCTIONS_PATH = path.join(ROOT, 'ai/project.case-study-instructions.md')
+
 export function entryDir(slug: string): string {
   return path.join(WORK_DIR, slug)
 }
@@ -31,6 +34,10 @@ export function contextPath(slug: string): string {
 
 export function writeupPath(slug: string): string {
   return path.join(entryDir(slug), 'writeup.md')
+}
+
+export function caseStudyPath(slug: string): string {
+  return path.join(entryDir(slug), 'case-study.json')
 }
 
 export function shotsDir(slug: string): string {

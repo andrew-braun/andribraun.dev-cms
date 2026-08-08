@@ -37,7 +37,8 @@ Commands
   discover   Scan GitHub and/or accept site URLs; seed ingest/manifest.json
   analyze    Gather repo context and probe the live site  → work/<slug>/context.{json,md}
   notes      Scaffold hand-written background notes       → ingest/notes/<slug>.md
-  writeup    Generate description_markdown with Claude    → work/<slug>/writeup.md
+  writeup    Generate description_markdown + case-study.json with Claude
+             → work/<slug>/writeup.md, case-study.json
   shots      Capture 2560x1440 screenshots + alt text     → work/<slug>/shots/
   sheet      Rebuild the manual-entry checklist           → work/<slug>/ENTER-ME.md
   status     Show the stage matrix for every entry

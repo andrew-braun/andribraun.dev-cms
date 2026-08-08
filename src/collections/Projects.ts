@@ -8,11 +8,90 @@ export const Projects: CollectionConfig = {
         beforeDocumentControls: [{ path: '@/components/ExtractTechnologiesButton' }],
       },
     },
+    useAsTitle: 'title',
   },
   fields: [
     {
-      name: 'title',
-      type: 'text',
+      type: 'row',
+      fields: [
+        {
+          name: 'title',
+          type: 'text',
+          admin: {
+            width: '60%',
+          },
+        },
+        {
+          name: 'slug',
+          type: 'text',
+          admin: {
+            width: '40%',
+          },
+          required: true,
+          unique: true,
+        },
+      ],
+    },
+    {
+      type: 'collapsible',
+      fields: [
+        {
+          name: 'clientName',
+          type: 'text',
+        },
+        {
+          name: 'status',
+          type: 'select',
+          options: [
+            { label: 'Live', value: 'live' },
+            { label: 'Ongoing', value: 'ongoing' },
+            { label: 'Completed', value: 'completed' },
+            { label: 'Archived', value: 'archived' },
+          ],
+        },
+        {
+          name: 'businessChallenge',
+          type: 'code',
+          admin: {
+            language: 'markdown',
+          },
+        },
+        {
+          name: 'contributionHighlights',
+          type: 'array',
+          fields: [
+            {
+              name: 'statement',
+              type: 'text',
+              required: true,
+            },
+          ],
+          labels: {
+            plural: 'Contribution highlights',
+            singular: 'Highlight',
+          },
+        },
+        {
+          name: 'outcomes',
+          type: 'array',
+          fields: [
+            {
+              name: 'statement',
+              type: 'text',
+              required: true,
+            },
+            {
+              name: 'metric',
+              type: 'text',
+            },
+          ],
+          labels: {
+            plural: 'Outcomes',
+            singular: 'Outcome',
+          },
+        },
+      ],
+      label: 'case study',
     },
     {
       name: 'description',

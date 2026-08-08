@@ -8,8 +8,14 @@ import fs from 'fs/promises'
 
 import type { EntryContext } from './types'
 
+import {
+  caseStudyOutputSchema,
+  type CaseStudySidecar,
+  emptyCaseStudyStub,
+  normalizeCaseStudy,
+} from './caseStudy'
 import { IngestError } from './log'
-import { WRITEUP_INSTRUCTIONS_PATH } from './paths'
+import { CASE_STUDY_INSTRUCTIONS_PATH, WRITEUP_INSTRUCTIONS_PATH } from './paths'
 
 const MODEL = 'claude-opus-5'
 
@@ -143,6 +149,43 @@ ${briefing}`,
     .replace(/^```(?:markdown|md)?\s*\n/, '')
     .replace(/\n```\s*$/, '')
     .trim()
+}
+
+/**
+ * Produces structured case-study fields as a sidecar JSON payload. Failures
+ * return an empty stub with every field flagged for review so the writeup
+ * stage can still succeed.
+ */
+export async function generateCaseStudy(context: EntryContext): Promise<CaseStudySidecar> {
+  const instructions = await fs.readFile(CASE_STUDY_INSTRUCTIONS_PATH, 'utf8')
+  const briefing = renderContext(context)
+
+  try {
+    const response = await sendMessage(
+      [
+        {
+          content: `Produce the case-study sidecar JSON for the project below.
+
+Ground every claim in the evidence. If a field is uncertain, omit it and list it in needsReview.
+
+${briefing}`,
+          role: 'user',
+        },
+      ],
+      {
+        effort: 'medium',
+        maxTokens: 4000,
+        model: MODEL,
+        outputSchema: caseStudyOutputSchema,
+        system: instructions,
+      },
+    )
+
+    const parsed = parseJsonFromResponse<unknown>(response, {})
+    return normalizeCaseStudy(parsed)
+  } catch {
+    return emptyCaseStudyStub()
+  }
 }
 
 const altTextSchema: JsonSchema = {

@@ -249,6 +249,7 @@ export interface Project {
         id?: string | null
       }[]
     | null
+  summary?: string | null
   description?: {
     root: {
       type: string
@@ -705,6 +706,7 @@ export interface ProjectsSelect<T extends boolean = true> {
         metric?: T
         id?: T
       }
+  summary?: T
   description?: T
   description_markdown?: T
   metadata?:

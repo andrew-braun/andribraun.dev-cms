@@ -94,6 +94,13 @@ export const Projects: CollectionConfig = {
       label: 'case study',
     },
     {
+      name: 'summary',
+      type: 'code',
+      admin: {
+        language: 'markdown',
+      },
+    },
+    {
       name: 'description',
       type: 'richText',
     },

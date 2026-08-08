@@ -6,6 +6,7 @@ import * as migration_20260305_150010 from './20260305_150010'
 import * as migration_20260426_062647 from './20260426_062647'
 import * as migration_20260804_153657 from './20260804_153657'
 import * as migration_20260808_081134_rename_project_fields_snake_case from './20260808_081134_rename_project_fields_snake_case'
+import * as migration_20260808_082406 from './20260808_082406'
 
 export const migrations = [
   {
@@ -47,5 +48,10 @@ export const migrations = [
     name: '20260808_081134_rename_project_fields_snake_case',
     down: migration_20260808_081134_rename_project_fields_snake_case.down,
     up: migration_20260808_081134_rename_project_fields_snake_case.up,
+  },
+  {
+    name: '20260808_082406',
+    down: migration_20260808_082406.down,
+    up: migration_20260808_082406.up,
   },
 ]

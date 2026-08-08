@@ -265,7 +265,14 @@ export interface Project {
     }
     [k: string]: unknown
   } | null
+  /**
+   * The full write-up. Kept whole for projects that do not follow the four-section structure; otherwise it is the same content as the sections below.
+   */
   description_markdown?: string | null
+  intro_markdown?: string | null
+  tech_stack_markdown?: string | null
+  implementation_markdown?: string | null
+  outcome_markdown?: string | null
   metadata?: {
     technologies?: (number | Technology)[] | null
   }
@@ -709,6 +716,10 @@ export interface ProjectsSelect<T extends boolean = true> {
   summary?: T
   description?: T
   description_markdown?: T
+  intro_markdown?: T
+  tech_stack_markdown?: T
+  implementation_markdown?: T
+  outcome_markdown?: T
   metadata?:
     | T
     | {

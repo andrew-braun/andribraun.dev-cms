@@ -11,6 +11,7 @@ import { log } from '../lib/log'
 import { loadManifest, readJson, selectEntries, updateEntry } from '../lib/manifest'
 import { caseStudyPath, shotsDir, shotsManifestPath, writeupPath } from '../lib/paths'
 import { buildProjectData } from '../lib/projectData'
+import { splitWriteup, WRITEUP_SECTION_KEYS } from '../lib/writeupSections'
 
 /**
  * Writes reviewed entries into the CMS: uploads screenshots to the media
@@ -46,18 +47,45 @@ export async function publish(args: ParsedArgs): Promise<void> {
   }
 
   if (dryRun) {
-    const target = resolveTarget(remote)
+    // A remote dry run can afford to tell the truth: resolving a slug is a
+    // plain GET, so it reports the real create-vs-update outcome instead of
+    // inferring it from the manifest. The local backend is deliberately left
+    // unopened — a dry run should not connect to a database at all.
+    const lookup = remote ? remoteBackend() : null
+    const target = lookup?.target ?? resolveTarget(remote)
+
     log.banner(`Publish target: ${target}`)
     log.info('Dry run — no database or storage writes')
+
     for (const entry of ready) {
       const shots = (await readJson<CapturedShot[]>(shotsManifestPath(entry.slug))) ?? []
       const markdown = await fs.readFile(writeupPath(entry.slug), 'utf8')
       const caseStudy = await readJson<CaseStudySidecar>(caseStudyPath(entry.slug))
-      const existing = entry.publishedTo?.[target]
-      const action = existing ? `update #${existing.id}` : 'create'
+
+      let existingId = entry.publishedTo?.[target]?.id ?? null
+      if (existingId === null && lookup) {
+        existingId = await lookup.findProjectBySlug(entry.slug)
+      }
+
+      const action = existingId === null ? 'create' : `update #${existingId}`
+      const found = Object.keys(splitWriteup(markdown).sections).length
+
+      // Say which way an empty capture falls, so "0 images" is never read as
+      // "the images on the target are about to go".
+      const media =
+        shots.length > 0
+          ? `${shots.length} images`
+          : existingId === null
+            ? 'no images'
+            : 'media left as-is'
+
       log.ok(
-        `${entry.slug}: ${action}, ${markdown.length} chars, ${shots.length} images, case-study=${caseStudy ? 'yes' : 'missing'}`,
+        `${entry.slug}: ${action}, ${markdown.length} chars, ${media}, ${found}/${WRITEUP_SECTION_KEYS.length} sections, case-study=${caseStudy ? 'yes' : 'missing'}`,
       )
+    }
+
+    if (lookup) {
+      log.detail('"create" means no project on the target shares that slug.')
     }
     return
   }
@@ -76,6 +104,19 @@ export async function publish(args: ParsedArgs): Promise<void> {
         log.warn(`${entry.slug}: case-study.json missing — publishing without case-study fields`)
       }
 
+      // Section fields are a convenience for layout; a write-up that does not
+      // follow the house structure still publishes on description_markdown.
+      const split = splitWriteup(markdown)
+      const missing = WRITEUP_SECTION_KEYS.filter((key) => !split.sections[key])
+      if (missing.length > 0) {
+        log.warn(
+          `${entry.slug}: no ${missing.join(', ')} — description_markdown still holds the full write-up`,
+        )
+      }
+      for (const heading of split.unmatched) {
+        log.detail(`section "${heading}" maps to no field — it stays in description_markdown only`)
+      }
+
       // Resolve the destination row before uploading anything, so a project
       // entered by hand is updated rather than colliding on the unique slug.
       let existingId = entry.publishedTo?.[backend.target]?.id ?? null
@@ -89,6 +130,7 @@ export async function publish(args: ParsedArgs): Promise<void> {
       }
 
       const mediaIds: number[] = []
+      let heroMediaId: number | undefined
       for (const shot of shots) {
         const filePath = path.join(shotsDir(entry.slug), shot.file)
         const data = await fs.readFile(filePath)
@@ -99,10 +141,13 @@ export async function publish(args: ParsedArgs): Promise<void> {
           mimetype: 'image/png',
         })
         mediaIds.push(mediaId)
-        log.detail(`uploaded ${shot.file} (media #${mediaId})`)
+        if (shot.hero) {
+          heroMediaId = mediaId
+        }
+        log.detail(`uploaded ${shot.file} (media #${mediaId})${shot.hero ? ' — hero' : ''}`)
       }
 
-      const data = buildProjectData(entry, markdown, mediaIds, visible, caseStudy)
+      const data = buildProjectData(entry, markdown, mediaIds, visible, caseStudy, heroMediaId)
 
       let projectId: number
       if (existingId !== null) {

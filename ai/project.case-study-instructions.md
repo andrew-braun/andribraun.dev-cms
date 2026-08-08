@@ -5,6 +5,12 @@ output is JSON matching the provided schema (not markdown).
 
 ## Fields
 
+- **summary** — A 1–2 sentence standalone blurb (roughly 20–45 words) in plain
+  language, used on project cards and listings where the full write-up is not
+  shown. Say what the project is, who it's for, and the one thing that makes it
+  interesting. No headings, no bullets, no `<span class="tech">` tags — those
+  belong only in the long-form description. It must read on its own, so do not
+  open with "This project" or "The site".
 - **client_name** — Short client or product label (e.g. "WhereNext.ai"). Omit if
   unknown.
 - **business_challenge** — Concise markdown describing the problem or brief.
@@ -17,7 +23,7 @@ output is JSON matching the provided schema (not markdown).
 - **status** — One of: `live`, `ongoing`, `completed`, `archived`. Prefer
   `live` only when a working `liveUrl` / deployed site is in the evidence.
 - **needsReview** — Array of field names you are unsure about, or that you
-  omitted. Use the exact keys: `client_name`, `business_challenge`,
+  omitted. Use the exact keys: `summary`, `client_name`, `business_challenge`,
   `contribution_highlights`, `outcomes`, `status`.
 
 ## Grounding rules

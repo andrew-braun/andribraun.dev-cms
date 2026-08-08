@@ -29,7 +29,12 @@ You are tasked with analyzing a software project repository and creating a compr
 - The output should be plain text that can be directly copied and pasted into a `.md` file
 - Start directly with the introduction text - no preamble, no explanations, just the raw markdown
 
-Your write-up MUST be in Markdown and follow this exact structure:
+Your write-up MUST be in Markdown and follow this exact structure. The four
+section headings below are parsed verbatim into separate CMS fields
+(`intro_markdown`, `tech_stack_markdown`, `implementation_markdown`,
+`outcome_markdown`), so do not rename, reorder, merge, or add `##` headings —
+anything under an unrecognised heading is dropped from those fields. Do not
+open the document with a `#` title.
 
 ### 1. Introduction (2-3 sentences)
 

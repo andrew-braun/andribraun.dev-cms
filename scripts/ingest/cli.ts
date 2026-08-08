@@ -15,7 +15,7 @@ import { sheet } from './commands/sheet'
 import { shots } from './commands/shots'
 import { status } from './commands/status'
 import { writeup } from './commands/writeup'
-import { parseArgs, type ParsedArgs } from './lib/args'
+import { hasFlag, parseArgs, type ParsedArgs } from './lib/args'
 import { IngestError, log } from './lib/log'
 
 const COMMANDS: Record<string, (args: ParsedArgs) => Promise<void>> = {
@@ -28,6 +28,44 @@ const COMMANDS: Record<string, (args: ParsedArgs) => Promise<void>> = {
   shots,
   status,
   writeup,
+}
+
+/**
+ * The flags each command accepts.
+ *
+ * An unrecognised flag is a hard error rather than a silent no-op: `publish
+ * --dryrun` would otherwise swallow the typo and write for real, which is the
+ * exact mistake the flag was there to prevent. That matters more now that
+ * `--remote` points the same command at production.
+ */
+const KNOWN_FLAGS: Record<string, string[]> = {
+  analyze: ['force'],
+  discover: ['all', 'archived', 'forks', 'limit', 'no-github', 'owner', 'urls'],
+  notes: [],
+  publish: ['dry-run', 'no-tech', 'remote', 'visible'],
+  remote: ['alt', 'collection', 'data', 'depth', 'json', 'limit', 'page', 'sort', 'where', 'yes'],
+  sheet: [],
+  shots: ['force', 'max', 'no-alt'],
+  status: [],
+  writeup: ['force'],
+}
+
+function assertKnownFlags(command: string, args: ParsedArgs): void {
+  const allowed = KNOWN_FLAGS[command] ?? []
+  const unknown = Object.keys(args.flags).filter((flag) => !allowed.includes(flag))
+
+  if (unknown.length === 0) {
+    return
+  }
+
+  const named = unknown.map((flag) => `--${flag}`).join(', ')
+  throw new IngestError(
+    `Unknown flag${unknown.length > 1 ? 's' : ''} for "${command}": ${named}\n  ` +
+      (allowed.length > 0
+        ? `Accepted: ${allowed.map((flag) => `--${flag}`).join(', ')}`
+        : `${command} takes no flags.`) +
+      `\n  Run "pnpm ingest ${command} --help" for details.`,
+  )
 }
 
 const USAGE = `
@@ -113,7 +151,17 @@ async function main(): Promise<void> {
     return
   }
 
-  await handler(parseArgs(rest))
+  const args = parseArgs(rest)
+
+  // `publish --help` used to fall through and publish for real.
+  if (hasFlag(args, 'help')) {
+    console.log(USAGE)
+    return
+  }
+
+  assertKnownFlags(command, args)
+
+  await handler(args)
 }
 
 try {

@@ -4,7 +4,7 @@ import type { EntryContext } from '../lib/types'
 
 import { generateCaseStudy, generateWriteup } from '../lib/ai'
 import { hasFlag, type ParsedArgs } from '../lib/args'
-import { emptyCaseStudyStub } from '../lib/caseStudy'
+import { emptyCaseStudyStub, summaryFromWriteup } from '../lib/caseStudy'
 import { log } from '../lib/log'
 import { loadManifest, readJson, selectEntries, updateEntry } from '../lib/manifest'
 import { readNotes } from '../lib/notes'
@@ -68,6 +68,14 @@ export async function writeup(args: ParsedArgs): Promise<void> {
         )
         caseStudy = emptyCaseStudyStub()
       }
+
+      // The write-up's opening paragraph is the same 2–3 sentence layperson
+      // pitch `summary` wants, so a missing summary borrows it rather than
+      // shipping the field empty. It stays flagged in needsReview.
+      if (!caseStudy.summary) {
+        caseStudy.summary = summaryFromWriteup(markdown)
+      }
+
       await fs.writeFile(
         caseStudyPath(entry.slug),
         `${JSON.stringify(caseStudy, null, 2)}\n`,

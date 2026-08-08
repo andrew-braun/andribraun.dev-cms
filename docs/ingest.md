@@ -164,13 +164,43 @@ See [Background notes](#background-notes).
 1. With `ai/project.summary-instructions.md` → `writeup.md` (technical
    `description_markdown`, including `<span class="tech" data-tag="...">` tags).
 2. With `ai/project.case-study-instructions.md` → `case-study.json` (structured
-   `client_name`, `business_challenge`, `contribution_highlights`, `outcomes`,
-   `status`, plus a `needsReview` list).
+   `summary`, `client_name`, `business_challenge`, `contribution_highlights`,
+   `outcomes`, `status`, plus a `needsReview` list).
+
+`summary` is the short card blurb, kept free of `<span class="tech">` tags —
+only `description_markdown` feeds technology extraction. When the model omits
+it, the write-up's opening paragraph is used instead (spans stripped), and
+`summary` stays on the `needsReview` list so you give it a second look.
 
 Edit either file freely before pasting into admin; the checklist always points
 at the current files. `--force` regenerates both. If case-study generation
 fails, a stub sidecar with every field flagged for review is written so the
 write-up stage can still succeed.
+
+### Description sections
+
+`writeup.md` always follows the same four-section shape, so `publish` also
+splits it into one field per section and stores each alongside the whole
+document:
+
+| Field                     | From `writeup.md`               |
+| ------------------------- | ------------------------------- |
+| `intro_markdown`          | everything above the first `##` |
+| `tech_stack_markdown`     | `## Tech Stack & Architecture`  |
+| `implementation_markdown` | `## Key Implementation Details` |
+| `outcome_markdown`        | `## Outcome`                    |
+
+The split exists so the front end can lay each section out on its own rather
+than rendering one markdown blob. `description_markdown` still holds the
+complete write-up and is what technology extraction reads, so a project that
+doesn't fit the mould loses nothing — it just publishes with fewer section
+fields, and `publish` says which ones are missing. Headings that match no field
+are reported too; their content stays in `description_markdown` only.
+
+Matching is on heading text, not position, and is loose (`## Architecture` and
+`## Results` both land correctly), but renaming sections wholesale is how you
+end up with empty fields. `ai/project.summary-instructions.md` tells the model
+to keep the headings verbatim for exactly this reason.
 
 **`shots`** — renders each target at a 1280×720 viewport with a 2× device scale
 factor, producing 2560×1440 PNGs that match your existing media. Before each
@@ -181,6 +211,19 @@ fonts. Alt text is generated per image by Claude vision (`--no-alt` to skip).
 Targets come from `screenshots` in the manifest when set; otherwise the homepage
 plus same-origin nav routes discovered during `analyze`, capped at `maxShots`
 (default 5). Pages behind a login can't be captured — pin public URLs instead.
+
+One capture is flagged as the `hero`, filling the Project `hero_image` field.
+It defaults to the home page; set `hero` on the manifest entry to point it
+somewhere more representative:
+
+```json
+{ "slug": "glyphin", "hero": { "label": "Editor", "url": "/editor" } }
+```
+
+The hero is captured outside the `maxShots` cap, so pinning it never costs a
+gallery slot. When it lands on a route the gallery already covers — the default
+case — that existing capture is flagged rather than shot twice, so no duplicate
+lands in your media library.
 
 **`sheet`** — regenerates `ENTER-ME.md` from whatever the other stages have
 produced. `writeup` and `shots` call it automatically; run it directly after
@@ -201,14 +244,18 @@ For each project, open `ingest/work/<slug>/ENTER-ME.md` and follow it against
    `client_name`, `business_challenge`, `contribution_highlights`, `outcomes`, and
    `status`. Fill anything listed under **Needs review** yourself. (Testimonials
    are not wired yet.)
-3. **description_markdown** — paste the whole of `writeup.md`. Leave the
+3. **summary** — paste the sheet's `## summary` block into the `summary` field.
+4. **description_markdown** — paste the whole of `writeup.md`. Leave the
    rich-text `description` field empty; your existing projects use
    `description_markdown` only. The sheet includes a one-line `xclip`/`pbcopy`
-   command if you'd rather not open the file.
-4. **Media** — upload the PNGs from `shots/`. Each one needs `alt` text, and the
+   command if you'd rather not open the file. Then fill the four **description
+   sections** fields from the slices the sheet's table names — `publish` does
+   this for you, but manual entry doesn't.
+5. **Media** — upload the PNGs from `shots/`. Each one needs `alt` text, and the
    sheet prints it on its own line under the matching filename. Set `thumbnail`
-   to the first image and add all of them to `images`.
-5. **Save**, then click **Extract Technologies**. Nothing to type — it parses
+   to the first image, `hero_image` to the one the sheet names, and add all of
+   them to `images`.
+6. **Save**, then click **Extract Technologies**. Nothing to type — it parses
    the markdown you just pasted, creates missing technology records, and links
    them to the project.
 
@@ -242,8 +289,11 @@ Notes that apply to both modes:
 - It prints its target before doing anything, and `--dry-run` reports without
   writing.
 - It maps manifest `slug` onto the Project `slug`, and maps `case-study.json`
-  into the case-study fields when present. A missing sidecar still publishes
+  into `summary` and the case-study fields when present. A missing sidecar still publishes
   the write-up, links, and media (with a warning).
+- It writes `writeup.md` to `description_markdown` and, in the same pass, to the
+  four [description section](#description-sections) fields. Sections it can't
+  find are warned about rather than blocking the publish.
 - If no publish is recorded for the target, it looks the slug up first and
   **updates an existing project** rather than colliding on the unique
   constraint — so a project you already entered by hand gets adopted, not

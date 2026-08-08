@@ -7,6 +7,12 @@ import type { CapturedShot, ManifestEntry } from './types'
 import { CASE_STUDY_FIELD_KEYS } from './caseStudy'
 import { readJson } from './manifest'
 import { caseStudyPath, entryDir, rel, shotsDir, shotsManifestPath, writeupPath } from './paths'
+import {
+  splitWriteup,
+  WRITEUP_SECTION_KEYS,
+  WRITEUP_SECTION_SOURCES,
+  type WriteupSplit,
+} from './writeupSections'
 
 /**
  * Writes `ingest/work/<slug>/ENTER-ME.md` — a single checklist for entering the
@@ -20,10 +26,10 @@ import { caseStudyPath, entryDir, rel, shotsDir, shotsManifestPath, writeupPath 
 export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
   const dir = entryDir(entry.slug)
 
-  const hasWriteup = await exists(writeupPath(entry.slug))
+  const writeup = await readWriteup(entry.slug)
   const shots = (await readJson<CapturedShot[]>(shotsManifestPath(entry.slug))) ?? []
 
-  if (!hasWriteup && shots.length === 0) {
+  if (writeup === null && shots.length === 0) {
     return null
   }
 
@@ -51,7 +57,19 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
     ...renderCaseStudySection(entry.slug, caseStudy),
   ]
 
-  if (hasWriteup) {
+  lines.push('## summary', '')
+  if (caseStudy?.summary) {
+    lines.push(
+      'Paste into the `summary` field (sits above `description`):',
+      '',
+      caseStudy.summary,
+      '',
+    )
+  } else {
+    lines.push('_No summary generated yet — run `pnpm ingest writeup`._', '')
+  }
+
+  if (writeup !== null) {
     lines.push(
       '## description_markdown',
       '',
@@ -66,6 +84,7 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
       '> Leave the rich-text `description` field empty — the published projects',
       '> use `description_markdown` only.',
       '',
+      ...renderSectionsSection(splitWriteup(writeup)),
     )
   } else {
     lines.push('## description_markdown', '', '_No write-up generated yet._', '')
@@ -78,6 +97,8 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
       `Upload from \`${rel(shotsDir(entry.slug))}\` — ${shots.length} image${shots.length === 1 ? '' : 's'} at 2560×1440.`,
       '',
       `Set **thumbnail** to \`${shots[0].file}\`, and add all ${shots.length} to **images**.`,
+      '',
+      `Set **hero_image** to \`${(shots.find((shot) => shot.hero) ?? shots[0]).file}\`.`,
       '',
       'Each upload needs its `alt` text — copy the line under each filename:',
       '',
@@ -168,15 +189,48 @@ export function renderCaseStudySection(slug: string, caseStudy: CaseStudySidecar
   return lines
 }
 
+/**
+ * Lists the split-out description fields. The bodies are deliberately not
+ * reproduced — they are verbatim slices of `writeup.md`, and a second copy here
+ * would be one more thing to keep in sync. What the sheet gives you is which
+ * slice belongs in which field, and which ones this write-up is missing.
+ */
+export function renderSectionsSection(split: WriteupSplit): string[] {
+  const lines: string[] = [
+    '### Description sections',
+    '',
+    'The same write-up, split for layout. `pnpm ingest publish` fills these',
+    'automatically; entering by hand, copy each slice of **[writeup.md](./writeup.md)**',
+    'into its field.',
+    '',
+    '| Field | From writeup.md | Present |',
+    '| --- | --- | --- |',
+  ]
+
+  for (const key of WRITEUP_SECTION_KEYS) {
+    lines.push(`| ${key} | ${WRITEUP_SECTION_SOURCES[key]} | ${split.sections[key] ? '✅' : '—'} |`)
+  }
+  lines.push('')
+
+  if (split.unmatched.length > 0) {
+    lines.push(
+      `> Headings with no matching field: ${split.unmatched.map((heading) => `\`${heading}\``).join(', ')}.`,
+      '> That content lives in `description_markdown` only.',
+      '',
+    )
+  }
+
+  return lines
+}
+
 function code(value?: string): string {
   return value ? `\`${value}\`` : '—'
 }
 
-async function exists(target: string): Promise<boolean> {
+async function readWriteup(slug: string): Promise<null | string> {
   try {
-    await fs.access(target)
-    return true
+    return await fs.readFile(writeupPath(slug), 'utf8')
   } catch {
-    return false
+    return null
   }
 }

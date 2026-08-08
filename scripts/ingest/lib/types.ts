@@ -15,6 +15,8 @@ export interface CapturedShot extends ShotSpec {
   /** File name relative to the entry's `shots/` directory. */
   file: string
   height: number
+  /** Marks the shot that fills the Project `hero_image` field. */
+  hero?: boolean
   width: number
 }
 
@@ -38,6 +40,13 @@ export interface ManifestEntry {
   featured?: boolean
   /** Full GitHub URL stored on the project. Derived from `repo` when omitted. */
   githubLink?: string
+  /**
+   * What `hero_image` should show. Defaults to the home page. A bare path
+   * (`/pricing`) is resolved against `liveUrl`. Captured outside the `maxShots`
+   * cap, and reuses an existing capture when it points at a route the gallery
+   * already covers.
+   */
+  hero?: ShotSpec
   /** Deployed site URL. Required for the `shots` stage. */
   liveUrl?: string
   /** Maximum screenshots to capture. Defaults to 5. */

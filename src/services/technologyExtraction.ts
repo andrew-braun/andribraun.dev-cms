@@ -248,8 +248,19 @@ export async function extractTechnologiesFromProject(
       return { created: [], linked: 0, message: 'Project not found', success: false }
     }
 
-    // Combine both description fields for comprehensive extraction
-    const markdownContent = (project.description_markdown as string) || ''
+    // `description_markdown` holds the whole write-up, so the split-out section
+    // fields are only worth reading when it is empty — a project entered
+    // section-by-section in the admin rather than through `pnpm ingest publish`.
+    const markdownContent =
+      (project.description_markdown as string) ||
+      [
+        project.intro_markdown,
+        project.tech_stack_markdown,
+        project.implementation_markdown,
+        project.outcome_markdown,
+      ]
+        .filter(Boolean)
+        .join('\n\n')
     const richTextContent = project.description ? extractTextFromLexical(project.description) : ''
     const textContent = [markdownContent, richTextContent].filter(Boolean).join('\n\n').trim()
 

@@ -2,10 +2,21 @@ import type { JsonSchema } from '@/app/lib/ai/claude'
 
 export type ProjectStatus = 'archived' | 'completed' | 'live' | 'ongoing'
 
+/**
+ * Every structured Project field the sidecar carries. `summary` is not part of
+ * the admin's "case study" group, but it is generated and reviewed the same
+ * way, so it rides along rather than needing a second sidecar.
+ */
 export type CaseStudyFieldKey =
-  'business_challenge' | 'client_name' | 'contribution_highlights' | 'outcomes' | 'status'
+  | 'business_challenge'
+  | 'client_name'
+  | 'contribution_highlights'
+  | 'outcomes'
+  | 'status'
+  | 'summary'
 
 export const CASE_STUDY_FIELD_KEYS: CaseStudyFieldKey[] = [
+  'summary',
   'client_name',
   'business_challenge',
   'contribution_highlights',
@@ -22,6 +33,8 @@ export interface CaseStudySidecar {
   needsReview: CaseStudyFieldKey[]
   outcomes?: { metric?: string; statement: string }[]
   status?: ProjectStatus
+  /** Short standalone blurb for the Project `summary` field. Plain markdown. */
+  summary?: string
 }
 
 export const caseStudyOutputSchema: JsonSchema = {
@@ -56,12 +69,42 @@ export const caseStudyOutputSchema: JsonSchema = {
       },
     },
     status: { type: 'string', enum: [...PROJECT_STATUSES] },
+    summary: { type: 'string' },
   },
   required: ['needsReview'],
 }
 
 export function emptyCaseStudyStub(): CaseStudySidecar {
   return { needsReview: [...CASE_STUDY_FIELD_KEYS] }
+}
+
+/** Unwraps `<span class="tech" ...>Name</span>` markers to their label text. */
+function stripTechSpans(value: string): string {
+  return value
+    .replace(/<span[^>]*>([\s\S]*?)<\/span>/g, '$1')
+    .replace(/[ \t]+/g, ' ')
+    .trim()
+}
+
+/**
+ * Falls back to the write-up's opening paragraph when the model omits
+ * `summary`. The write-up instructions already open with a 2–3 sentence
+ * layperson introduction, which is the same job the `summary` field does.
+ * `summary` stays in `needsReview` either way — an intro written to sit above
+ * the full description usually wants trimming to stand on its own.
+ */
+export function summaryFromWriteup(markdown: string): string | undefined {
+  const paragraph = markdown
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .find((block) => block !== '' && !block.startsWith('#') && !block.startsWith('```'))
+
+  if (!paragraph) {
+    return undefined
+  }
+
+  const plain = stripTechSpans(paragraph)
+  return plain === '' ? undefined : plain
 }
 
 function isStatus(value: unknown): value is ProjectStatus {
@@ -84,6 +127,12 @@ export function normalizeCaseStudy(raw: unknown): CaseStudySidecar {
 
   const input = raw as Record<string, unknown>
   const result: CaseStudySidecar = { needsReview: [] }
+
+  if (typeof input.summary === 'string' && input.summary.trim()) {
+    // Tech spans belong to description_markdown — the extraction service only
+    // reads that field, so a span here would render as literal markup.
+    result.summary = stripTechSpans(input.summary)
+  }
 
   if (typeof input.client_name === 'string' && input.client_name.trim()) {
     result.client_name = input.client_name.trim()
@@ -141,6 +190,9 @@ export function normalizeCaseStudy(raw: unknown): CaseStudySidecar {
   const fromModel = Array.isArray(input.needsReview) ? input.needsReview.filter(isFieldKey) : []
 
   const missing: CaseStudyFieldKey[] = []
+  if (!result.summary) {
+    missing.push('summary')
+  }
   if (!result.client_name) {
     missing.push('client_name')
   }

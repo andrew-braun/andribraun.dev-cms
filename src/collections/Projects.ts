@@ -108,8 +108,52 @@ export const Projects: CollectionConfig = {
       name: 'description_markdown',
       type: 'code',
       admin: {
+        description:
+          'The full write-up. Kept whole for projects that do not follow the four-section structure; otherwise it is the same content as the sections below.',
         language: 'markdown',
       },
+    },
+    {
+      type: 'collapsible',
+      admin: {
+        description:
+          'The write-up split into its standard sections, so the front end can lay each one out on its own.',
+      },
+      fields: [
+        {
+          name: 'intro_markdown',
+          type: 'code',
+          admin: {
+            language: 'markdown',
+          },
+          label: 'Introduction',
+        },
+        {
+          name: 'tech_stack_markdown',
+          type: 'code',
+          admin: {
+            language: 'markdown',
+          },
+          label: 'Tech stack & architecture',
+        },
+        {
+          name: 'implementation_markdown',
+          type: 'code',
+          admin: {
+            language: 'markdown',
+          },
+          label: 'Key implementation details',
+        },
+        {
+          name: 'outcome_markdown',
+          type: 'code',
+          admin: {
+            language: 'markdown',
+          },
+          label: 'Outcome',
+        },
+      ],
+      label: 'description sections',
     },
     {
       name: 'metadata',

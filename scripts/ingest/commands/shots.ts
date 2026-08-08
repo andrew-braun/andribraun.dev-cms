@@ -89,6 +89,16 @@ export async function shots(args: ParsedArgs): Promise<void> {
       log.step(`Capturing ${entry.slug}`)
 
       const targets = await resolveTargets(entry, maxOverride)
+
+      // The hero is a required field rather than a gallery slot, so it sits
+      // outside the `max` cap. When it points at a route the gallery already
+      // covers — the usual case, since both default to the home page — the
+      // existing capture is reused instead of shooting the same pixels twice.
+      const hero = resolveHero(entry)
+      if (!targets.some((target) => sameRoute(target.url, hero.url))) {
+        targets.push(hero)
+      }
+
       if (targets.length === 0) {
         log.warn(`${entry.slug}: no capturable URLs`)
         continue
@@ -135,6 +145,12 @@ export async function shots(args: ParsedArgs): Promise<void> {
         log.warn(`${entry.slug}: every capture failed`)
         continue
       }
+
+      // Fall back to the first successful capture so `hero_image` is never
+      // empty — a failed hero shot shouldn't leave the field unset.
+      const heroShot = captured.find((shot) => sameRoute(shot.url, hero.url)) ?? captured[0]
+      heroShot.hero = true
+      log.detail(`hero_image → ${heroShot.file}`)
 
       await writeJson(shotsManifestPath(entry.slug), captured)
       await updateEntry(entry.slug, (target) => {
@@ -227,6 +243,28 @@ async function resolveTargets(entry: ManifestEntry, maxOverride?: number): Promi
   }
 
   return targets
+}
+
+/**
+ * Resolves what `hero_image` should show: the manifest override when set,
+ * otherwise the home page, which is the most representative view of a site.
+ */
+function resolveHero(entry: ManifestEntry): ShotSpec {
+  const base = entry.liveUrl!
+  if (entry.hero) {
+    return { ...entry.hero, url: new URL(entry.hero.url, base).toString() }
+  }
+  return { label: 'Home', url: base }
+}
+
+/** Compares two absolute URLs by origin and path, ignoring a trailing slash. */
+function sameRoute(a: string, b: string): boolean {
+  const left = new URL(a)
+  const right = new URL(b)
+  return (
+    left.origin === right.origin &&
+    left.pathname.replace(/\/$/, '') === right.pathname.replace(/\/$/, '')
+  )
 }
 
 /** `/case-studies/otm` -> `Case Studies Otm`, used in the media filename. */

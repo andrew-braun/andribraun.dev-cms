@@ -36,7 +36,7 @@ export const Projects: CollectionConfig = {
       type: 'collapsible',
       fields: [
         {
-          name: 'clientName',
+          name: 'client_name',
           type: 'text',
         },
         {
@@ -50,14 +50,14 @@ export const Projects: CollectionConfig = {
           ],
         },
         {
-          name: 'businessChallenge',
+          name: 'business_challenge',
           type: 'code',
           admin: {
             language: 'markdown',
           },
         },
         {
-          name: 'contributionHighlights',
+          name: 'contribution_highlights',
           type: 'array',
           fields: [
             {
@@ -120,14 +120,14 @@ export const Projects: CollectionConfig = {
       type: 'collapsible',
       fields: [
         {
-          name: 'liveLink',
+          name: 'live_link',
           type: 'text',
         },
         {
-          name: 'snapshotLink',
+          name: 'snapshot_link',
           type: 'text',
         },
-        { name: 'githubLink', type: 'text' },
+        { name: 'github_link', type: 'text' },
       ],
       label: 'links',
     },
@@ -141,7 +141,15 @@ export const Projects: CollectionConfig = {
               name: 'thumbnail',
               type: 'upload',
               admin: {
-                width: '50%',
+                width: '33%',
+              },
+              relationTo: 'media',
+            },
+            {
+              name: 'hero_image',
+              type: 'upload',
+              admin: {
+                width: '33%',
               },
               relationTo: 'media',
             },
@@ -149,7 +157,7 @@ export const Projects: CollectionConfig = {
               name: 'images',
               type: 'upload',
               admin: {
-                width: '50%',
+                width: '33%',
               },
               hasMany: true,
               relationTo: 'media',

@@ -32,6 +32,7 @@ pnpm ingest analyze      # gather repo context + probe the live site
 pnpm ingest notes        # optional: hand-written background -> ingest/notes/
 pnpm ingest writeup      # generate description_markdown
 pnpm ingest shots        # capture screenshots + alt text
+pnpm ingest publish --remote   # upload + create/update on the live CMS
 ```
 
 For client work with no public repo, `ingest/notes/<slug>.md` lets you supply
@@ -40,12 +41,18 @@ Notes are treated as authoritative and outrank the scraped evidence.
 
 Output lands in the gitignored `ingest/work/<slug>/`, and each project gets an
 `ENTER-ME.md` checklist listing every field value, the write-up to paste, and
-each screenshot's alt text — so entering it in the admin panel is copy, paste,
-upload, then click **Extract Technologies**.
+each screenshot's alt text — so entering it in the admin panel by hand is copy,
+paste, upload, then click **Extract Technologies**.
 
-No stage touches the database. An optional `publish` command can write directly
-to whichever database `DATABASE_URI` points at, but it isn't part of the normal
-workflow. Run `pnpm ingest` for the full command reference.
+`publish` does that part for you. `--remote` sends everything to the live
+instance over its REST API — uploading the screenshots, creating or updating the
+project, and running technology extraction — using an API key from the
+**Third Party Access** collection (`PAYLOAD_REMOTE_URL`, `PAYLOAD_API_KEY`).
+Projects arrive hidden unless you pass `--visible`.
+
+`pnpm ingest remote` exposes the same connection for one-off reads, edits, and
+uploads (`ping`, `list`, `get`, `create`, `update`, `delete`, `upload`). Run
+`pnpm ingest` for the full command reference.
 
 **Reference**: [Ingest pipeline documentation](docs/ingest.md)
 

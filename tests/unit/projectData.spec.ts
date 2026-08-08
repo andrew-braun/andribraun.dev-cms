@@ -16,9 +16,9 @@ const entry: ManifestEntry = {
 describe('buildProjectData', () => {
   it('maps slug, writeup, and sidecar fields', () => {
     const caseStudy: CaseStudySidecar = {
-      businessChallenge: 'Fragmented planning.',
-      clientName: 'WhereNext.ai',
-      contributionHighlights: [{ statement: 'Built end-to-end' }],
+      business_challenge: 'Fragmented planning.',
+      client_name: 'WhereNext.ai',
+      contribution_highlights: [{ statement: 'Built end-to-end' }],
       needsReview: [],
       outcomes: [{ metric: 'Live product', statement: 'End-to-end experience' }],
       status: 'live',
@@ -29,9 +29,9 @@ describe('buildProjectData', () => {
     expect(data.slug).toBe('wherenext-ai')
     expect(data.title).toBe('WhereNext.ai')
     expect(data.description_markdown).toBe('# Writeup')
-    expect(data.clientName).toBe('WhereNext.ai')
-    expect(data.businessChallenge).toBe('Fragmented planning.')
-    expect(data.contributionHighlights).toEqual([{ statement: 'Built end-to-end' }])
+    expect(data.client_name).toBe('WhereNext.ai')
+    expect(data.business_challenge).toBe('Fragmented planning.')
+    expect(data.contribution_highlights).toEqual([{ statement: 'Built end-to-end' }])
     expect(data.outcomes).toEqual([{ metric: 'Live product', statement: 'End-to-end experience' }])
     expect(data.status).toBe('live')
     expect(data.display?.hide).toBe(true)
@@ -42,7 +42,7 @@ describe('buildProjectData', () => {
   it('omits case-study fields when sidecar is missing but still sets slug', () => {
     const data = buildProjectData(entry, 'body', [], true, null)
     expect(data.slug).toBe('wherenext-ai')
-    expect(data.clientName).toBeUndefined()
+    expect(data.client_name).toBeUndefined()
     expect(data.status).toBeUndefined()
     expect(data.display?.hide).toBe(false)
   })

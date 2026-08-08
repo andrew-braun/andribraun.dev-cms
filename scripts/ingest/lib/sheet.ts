@@ -41,9 +41,9 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
     '| --- | --- |',
     `| title | \`${entry.title}\` |`,
     `| slug | \`${entry.slug}\` |`,
-    `| links → liveLink | ${code(entry.liveUrl)} |`,
-    `| links → githubLink | ${code(entry.githubLink)} |`,
-    `| links → snapshotLink | ${code(entry.snapshotLink)} |`,
+    `| links → live_link | ${code(entry.liveUrl)} |`,
+    `| links → github_link | ${code(entry.githubLink)} |`,
+    `| links → snapshot_link | ${code(entry.snapshotLink)} |`,
     `| display → card_type | \`${entry.cardType ?? 'visual'}\` |`,
     `| display → featured | \`${entry.featured ?? false}\` |`,
     `| display → order | ${code(entry.order === undefined ? undefined : String(entry.order))} |`,
@@ -129,24 +129,24 @@ export function renderCaseStudySection(slug: string, caseStudy: CaseStudySidecar
   }
 
   lines.push('| Field | Value |', '| --- | --- |')
-  lines.push(`| clientName | ${code(caseStudy.clientName)} |`)
+  lines.push(`| client_name | ${code(caseStudy.client_name)} |`)
   lines.push(`| status | ${code(caseStudy.status)} |`)
   lines.push(
-    `| businessChallenge | ${caseStudy.businessChallenge ? 'see case-study.json / block below' : '—'} |`,
+    `| business_challenge | ${caseStudy.business_challenge ? 'see case-study.json / block below' : '—'} |`,
   )
   lines.push(
-    `| contributionHighlights | ${caseStudy.contributionHighlights?.length ?? 0} item(s) |`,
+    `| contribution_highlights | ${caseStudy.contribution_highlights?.length ?? 0} item(s) |`,
   )
   lines.push(`| outcomes | ${caseStudy.outcomes?.length ?? 0} item(s) |`)
   lines.push('')
 
-  if (caseStudy.businessChallenge) {
-    lines.push('### businessChallenge', '', caseStudy.businessChallenge, '')
+  if (caseStudy.business_challenge) {
+    lines.push('### business_challenge', '', caseStudy.business_challenge, '')
   }
 
-  if (caseStudy.contributionHighlights?.length) {
-    lines.push('### contributionHighlights', '')
-    for (const row of caseStudy.contributionHighlights) {
+  if (caseStudy.contribution_highlights?.length) {
+    lines.push('### contribution_highlights', '')
+    for (const row of caseStudy.contribution_highlights) {
       lines.push(`- ${row.statement}`)
     }
     lines.push('')

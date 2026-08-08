@@ -10,6 +10,7 @@ import { analyze } from './commands/analyze'
 import { discover } from './commands/discover'
 import { notes } from './commands/notes'
 import { publish } from './commands/publish'
+import { remote } from './commands/remote'
 import { sheet } from './commands/sheet'
 import { shots } from './commands/shots'
 import { status } from './commands/status'
@@ -22,6 +23,7 @@ const COMMANDS: Record<string, (args: ParsedArgs) => Promise<void>> = {
   discover,
   notes,
   publish,
+  remote,
   sheet,
   shots,
   status,
@@ -43,8 +45,12 @@ Commands
   sheet      Rebuild the manual-entry checklist           → work/<slug>/ENTER-ME.md
   status     Show the stage matrix for every entry
 
-  publish    Optional. Writes directly to the database DATABASE_URI points at.
-             Not needed for the copy-paste workflow.
+  publish    Write entries into a CMS: uploads the screenshots, creates or
+             updates the project, then extracts technologies.
+             --remote targets PAYLOAD_REMOTE_URL over the REST API (production);
+             without it, writes straight to the DATABASE_URI database.
+  remote     Read/write/upload against the remote instance directly:
+             ping | list | get | create | update | delete | upload
 
 Passing one or more slugs limits a stage to those entries (and overrides "skip").
 
@@ -59,9 +65,17 @@ Flags
   writeup    --force         Regenerate an existing write-up
   shots      --force         Recapture       --max=<n>  Override maxShots
              --no-alt        Skip AI alt-text generation
-  publish    --dry-run       Report what would happen, write nothing
+  publish    --remote        Publish over the REST API to PAYLOAD_REMOTE_URL
+             --dry-run       Report what would happen, write nothing
              --visible       Publish visible instead of hidden
              --no-tech       Skip the technology extraction pass
+  remote     list  <collection> [--limit=] [--page=] [--sort=] [--depth=]
+                              [--where=field=value | field:operator=value] [--json]
+             get   <collection> <id> [--depth=]
+             create <collection> --data=<json|file.json>
+             update <collection> <id> --data=<json|file.json>
+             delete <collection> <id> --yes
+             upload <file...> --alt="..." [--collection=media]
 
 Typical run
   pnpm ingest discover --urls=ingest/urls.txt
@@ -74,9 +88,13 @@ Notes are optional but matter most for sites with no repo, where the probe sees
 only rendered HTML. They are read fresh by writeup, so editing them needs no
 re-analyze — just: pnpm ingest writeup --force <slug>
 
-Then, per project, open ingest/work/<slug>/ENTER-ME.md and follow it:
-paste writeup.md into description_markdown, upload the PNGs from shots/ with
-the alt text listed on the sheet, save, then click "Extract Technologies".
+Then publish straight to production:
+  pnpm ingest remote ping               # check PAYLOAD_REMOTE_URL + PAYLOAD_API_KEY
+  pnpm ingest publish --remote --dry-run
+  pnpm ingest publish --remote          # creates hidden; add --visible to go live
+
+Or enter it by hand: ingest/work/<slug>/ENTER-ME.md lists every field, the
+write-up to paste into description_markdown, and each screenshot's alt text.
 `
 
 async function main(): Promise<void> {

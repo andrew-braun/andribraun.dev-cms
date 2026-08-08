@@ -10,17 +10,17 @@ describe('emptyCaseStudyStub', () => {
   it('flags every case-study field for review', () => {
     const stub = emptyCaseStudyStub()
     expect(stub.needsReview).toEqual([...CASE_STUDY_FIELD_KEYS])
-    expect(stub.clientName).toBeUndefined()
-    expect(stub.contributionHighlights).toBeUndefined()
+    expect(stub.client_name).toBeUndefined()
+    expect(stub.contribution_highlights).toBeUndefined()
   })
 })
 
 describe('normalizeCaseStudy', () => {
   it('keeps valid fields and drops invalid status', () => {
     const result = normalizeCaseStudy({
-      businessChallenge: 'Fragmented planning.',
-      clientName: ' WhereNext.ai ',
-      contributionHighlights: [{ statement: 'Built end-to-end' }, { statement: '  ' }],
+      business_challenge: 'Fragmented planning.',
+      client_name: ' WhereNext.ai ',
+      contribution_highlights: [{ statement: 'Built end-to-end' }, { statement: '  ' }],
       needsReview: ['status'],
       outcomes: [
         { metric: 'From idea to live product', statement: 'End-to-end experience' },
@@ -29,9 +29,9 @@ describe('normalizeCaseStudy', () => {
       status: 'shipping',
     })
 
-    expect(result.clientName).toBe('WhereNext.ai')
-    expect(result.businessChallenge).toBe('Fragmented planning.')
-    expect(result.contributionHighlights).toEqual([{ statement: 'Built end-to-end' }])
+    expect(result.client_name).toBe('WhereNext.ai')
+    expect(result.business_challenge).toBe('Fragmented planning.')
+    expect(result.contribution_highlights).toEqual([{ statement: 'Built end-to-end' }])
     expect(result.outcomes).toEqual([
       { metric: 'From idea to live product', statement: 'End-to-end experience' },
     ])
@@ -47,9 +47,9 @@ describe('normalizeCaseStudy', () => {
     expect(result.status).toBe('live')
     expect(result.needsReview).toEqual(
       expect.arrayContaining([
-        'clientName',
-        'businessChallenge',
-        'contributionHighlights',
+        'client_name',
+        'business_challenge',
+        'contribution_highlights',
         'outcomes',
       ]),
     )

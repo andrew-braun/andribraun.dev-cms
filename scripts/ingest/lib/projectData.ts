@@ -19,22 +19,22 @@ export function buildProjectData(
       hide: !visible,
       order: entry.order,
     },
-    githubLink: entry.githubLink,
+    github_link: entry.githubLink,
     images: mediaIds,
-    liveLink: entry.liveUrl,
-    snapshotLink: entry.snapshotLink,
+    live_link: entry.liveUrl,
+    snapshot_link: entry.snapshotLink,
     thumbnail: mediaIds[0],
     title: entry.title,
   }
 
-  if (caseStudy?.clientName) {
-    data.clientName = caseStudy.clientName
+  if (caseStudy?.client_name) {
+    data.client_name = caseStudy.client_name
   }
-  if (caseStudy?.businessChallenge) {
-    data.businessChallenge = caseStudy.businessChallenge
+  if (caseStudy?.business_challenge) {
+    data.business_challenge = caseStudy.business_challenge
   }
-  if (caseStudy?.contributionHighlights) {
-    data.contributionHighlights = caseStudy.contributionHighlights
+  if (caseStudy?.contribution_highlights) {
+    data.contribution_highlights = caseStudy.contribution_highlights
   }
   if (caseStudy?.outcomes) {
     data.outcomes = caseStudy.outcomes

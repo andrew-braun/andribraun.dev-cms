@@ -4,10 +4,11 @@ Prepares portfolio projects for entry: scans GitHub, generates write-ups with
 tech tags using Claude, and captures correctly-sized screenshots of the deployed
 sites with alt text.
 
-**The pipeline produces files, not database rows.** Everything lands in the
-gitignored `ingest/work/<slug>/`, and each project gets an `ENTER-ME.md`
-checklist you follow to paste it into the Payload admin. No stage touches a
-database unless you explicitly run the optional `publish` command.
+**The generating stages produce files, not database rows.** Everything lands in
+the gitignored `ingest/work/<slug>/`, and each project gets an `ENTER-ME.md`
+checklist you can follow by hand. Nothing reaches a CMS until you run
+[`publish`](#the-publish-command), which sends it to a local database or
+straight to production over the REST API.
 
 ```text
 discover ──▶ analyze ──▶ writeup ──▶ shots ──▶ ENTER-ME.md ──▶ you, in /admin
@@ -26,7 +27,8 @@ manifest    context.md      │      shots/*.png
 | `gh auth login`                         | `discover` and `analyze` read repos via the API |
 | `CLAUDE_API_KEY` in .env                | `writeup` and screenshot alt text               |
 | `pnpm exec playwright install chromium` | `shots`                                         |
-| `DATABASE_URI`, `R2_*`                  | the optional `publish` command only             |
+| `DATABASE_URI`, `R2_*`                  | `publish` against a local database              |
+| `PAYLOAD_REMOTE_URL`, `PAYLOAD_API_KEY` | `publish --remote` and the `remote` command     |
 
 ## Quick start
 
@@ -37,6 +39,7 @@ pnpm ingest analyze
 pnpm ingest notes                        # optional; then fill the files in
 pnpm ingest writeup
 pnpm ingest shots
+pnpm ingest publish --remote             # straight to production, hidden
 ```
 
 Then, per project, open `ingest/work/<slug>/ENTER-ME.md` and work through it in
@@ -93,9 +96,8 @@ appends newly-seen repos and URLs; it never overwrites your edits.
 `stages` timestamps are what make the pipeline resumable — a stage skips
 entries it has already completed. Pass `--force` to redo one.
 
-Entries also grow a `publishedTo` map if you ever use the optional
-[`publish` command](#the-optional-publish-command); the manual workflow never
-writes it.
+Entries also grow a `publishedTo` map once you use the
+[`publish` command](#the-publish-command); the manual workflow never writes it.
 
 Editing `title` changes both the project title and the screenshot filenames, so
 set the real titles before running `shots`. Re-run `pnpm ingest sheet` after any
@@ -162,7 +164,7 @@ See [Background notes](#background-notes).
 1. With `ai/project.summary-instructions.md` → `writeup.md` (technical
    `description_markdown`, including `<span class="tech" data-tag="...">` tags).
 2. With `ai/project.case-study-instructions.md` → `case-study.json` (structured
-   `clientName`, `businessChallenge`, `contributionHighlights`, `outcomes`,
+   `client_name`, `business_challenge`, `contribution_highlights`, `outcomes`,
    `status`, plus a `needsReview` list).
 
 Edit either file freely before pasting into admin; the checklist always points
@@ -196,7 +198,7 @@ For each project, open `ingest/work/<slug>/ENTER-ME.md` and follow it against
 1. **Fields** — the sheet lists `title`, `slug`, the three links, and the
    `display` values as a table. Copy them across. `slug` is required and unique.
 2. **Case study** — copy from `case-study.json` / the sheet section into
-   `clientName`, `businessChallenge`, `contributionHighlights`, `outcomes`, and
+   `client_name`, `business_challenge`, `contribution_highlights`, `outcomes`, and
    `status`. Fill anything listed under **Needs review** yourself. (Testimonials
    are not wired yet.)
 3. **description_markdown** — paste the whole of `writeup.md`. Leave the
@@ -212,29 +214,93 @@ For each project, open `ingest/work/<slug>/ENTER-ME.md` and follow it against
 
 Leave `display.hide` ticked while you review, then untick it to go live.
 
-## The optional `publish` command
+## The `publish` command
 
-`publish` does all of the above automatically against whatever database
-`DATABASE_URI` points at. **It is not part of the normal workflow** — the
-copy-paste route above is the intended one, and this exists for the day you want
-to batch a large number of projects and are comfortable pointing the script at a
-real database.
+`publish` does all of the above automatically — uploads the screenshots, creates
+or updates the project, then runs the technology extraction pass. It reaches a
+CMS in one of two ways:
 
-If you do use it, note:
+| Mode                           | Route                                 | Use for                    |
+| ------------------------------ | ------------------------------------- | -------------------------- |
+| `pnpm ingest publish`          | Local API, straight to `DATABASE_URI` | a database on this machine |
+| `pnpm ingest publish --remote` | REST API of `PAYLOAD_REMOTE_URL`      | production                 |
 
-- It prints its target database before doing anything, and `--dry-run` reports
-  without writing.
+`--remote` is the one that removes the copy-paste work. Production's database
+isn't reachable from here and its media live in R2 behind the instance's own
+storage adapter, so writes go over HTTP to the running instance instead —
+authenticated with an API key, exactly as the admin panel would.
+
+```bash
+pnpm ingest remote ping                     # check the URL and key first
+pnpm ingest publish --remote --dry-run      # report, write nothing
+pnpm ingest publish --remote talkspark      # one entry, created hidden
+pnpm ingest publish --remote --visible      # everything ready, live immediately
+```
+
+Notes that apply to both modes:
+
+- It prints its target before doing anything, and `--dry-run` reports without
+  writing.
 - It maps manifest `slug` onto the Project `slug`, and maps `case-study.json`
   into the case-study fields when present. A missing sidecar still publishes
   the write-up, links, and media (with a warning).
+- If no publish is recorded for the target, it looks the slug up first and
+  **updates an existing project** rather than colliding on the unique
+  constraint — so a project you already entered by hand gets adopted, not
+  duplicated.
 - Projects are created with `display.hide` set unless you pass `--visible`.
-- `publishedTo` in the manifest is keyed by database (`host:port/name`), so a
-  project ID recorded against dev is never used to update a row in prod, and
-  `status` notes which databases an entry has been published to.
+- `publishedTo` in the manifest is keyed by target — `host:port/name` for a
+  database, `remote:<host>` for an instance — so a project ID recorded against
+  dev is never used to update a row in prod.
+- Re-publishing uploads the screenshots again rather than reusing the existing
+  media rows, so repeated runs leave orphaned images behind. Prune them with
+  `pnpm ingest remote list media` and `remote delete media <id>`.
 - An inline `DATABASE_URI=… pnpm ingest publish` overrides `.env`, since dotenv
   doesn't overwrite variables that are already set.
 
-Flags: `--dry-run`, `--visible`, `--no-tech` (skip technology extraction).
+Flags: `--remote`, `--dry-run`, `--visible`, `--no-tech` (skip technology
+extraction).
+
+## Reaching the remote instance directly
+
+`pnpm ingest remote` is the same REST client exposed for one-off reads and
+writes — checking what's actually live, fixing a field, uploading an image
+outside the pipeline.
+
+```bash
+pnpm ingest remote ping                       # verify credentials
+pnpm ingest remote list projects --limit=50
+pnpm ingest remote list projects --where=slug=talkspark
+pnpm ingest remote list media --where=alt:like=TalkSpark --json
+pnpm ingest remote get projects 12 --depth=2
+pnpm ingest remote update projects 12 --data='{"display":{"hide":false}}'
+pnpm ingest remote create technologies --data=./new-tech.json
+pnpm ingest remote upload ./screenshot.png --alt="Home page"
+pnpm ingest remote delete media 88 --yes
+```
+
+`--data` takes inline JSON or a path to a JSON file. `--where` takes
+`field=value`, or `field:operator=value` for any Payload operator (`like`,
+`not_equals`, `greater_than`, …). `delete` shows you what it's about to remove
+and does nothing until you add `--yes`.
+
+### Credentials
+
+Both `--remote` publishing and the `remote` command read two variables:
+
+```bash
+PAYLOAD_REMOTE_URL=https://cms.andribraun.dev
+PAYLOAD_API_KEY=<key>
+```
+
+Generate the key in the admin panel under **Third Party Access**: create a
+document, tick **Enable API Key**, save, and copy the generated key. The key
+authenticates as that document, and the `third-party-access` collection has no
+custom access control, so it gets the same create/update/delete rights a
+logged-in user has. Treat it as a production credential — `.env` is gitignored,
+and revoking it is a matter of deleting the document.
+
+If the key lives on a different collection, set `PAYLOAD_API_KEY_COLLECTION`.
 
 ### Why not export/import
 

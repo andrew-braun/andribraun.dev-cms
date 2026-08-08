@@ -5,11 +5,11 @@ output is JSON matching the provided schema (not markdown).
 
 ## Fields
 
-- **clientName** — Short client or product label (e.g. "WhereNext.ai"). Omit if
+- **client_name** — Short client or product label (e.g. "WhereNext.ai"). Omit if
   unknown.
-- **businessChallenge** — Concise markdown describing the problem or brief.
+- **business_challenge** — Concise markdown describing the problem or brief.
   Plain paragraphs only; no code fences. One short block is enough.
-- **contributionHighlights** — 2–4 short statements about what _you_ built or
+- **contribution_highlights** — 2–4 short statements about what _you_ built or
   owned (architecture, product work, integrations). Plain text; no bullets
   inside each statement.
 - **outcomes** — 2–4 rows. Each has a required `statement` and an optional
@@ -17,8 +17,8 @@ output is JSON matching the provided schema (not markdown).
 - **status** — One of: `live`, `ongoing`, `completed`, `archived`. Prefer
   `live` only when a working `liveUrl` / deployed site is in the evidence.
 - **needsReview** — Array of field names you are unsure about, or that you
-  omitted. Use the exact keys: `clientName`, `businessChallenge`,
-  `contributionHighlights`, `outcomes`, `status`.
+  omitted. Use the exact keys: `client_name`, `business_challenge`,
+  `contribution_highlights`, `outcomes`, `status`.
 
 ## Grounding rules
 

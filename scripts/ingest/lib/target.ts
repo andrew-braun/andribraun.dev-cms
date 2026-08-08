@@ -26,3 +26,15 @@ export function currentTarget(): string {
     throw new IngestError(`DATABASE_URI is not a valid connection string: ${uri.slice(0, 24)}...`)
   }
 }
+
+/**
+ * Target key for a publish made over the REST API instead of a direct database
+ * connection. Prefixed so it can never collide with a `currentTarget()` key —
+ * publishing to a local database and to the remote instance that fronts a
+ * different database must stay two separate records.
+ *
+ * @param host - Host of the remote instance, e.g. `cms.andribraun.dev`.
+ */
+export function remoteTarget(host: string): string {
+  return `remote:${host}`
+}

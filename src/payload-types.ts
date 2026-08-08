@@ -233,10 +233,10 @@ export interface Project {
   id: number
   title?: string | null
   slug: string
-  clientName?: string | null
+  client_name?: string | null
   status?: ('live' | 'ongoing' | 'completed' | 'archived') | null
-  businessChallenge?: string | null
-  contributionHighlights?:
+  business_challenge?: string | null
+  contribution_highlights?:
     | {
         statement: string
         id?: string | null
@@ -268,10 +268,11 @@ export interface Project {
   metadata?: {
     technologies?: (number | Technology)[] | null
   }
-  liveLink?: string | null
-  snapshotLink?: string | null
-  githubLink?: string | null
+  live_link?: string | null
+  snapshot_link?: string | null
+  github_link?: string | null
   thumbnail?: (number | null) | Media
+  hero_image?: (number | null) | Media
   images?: (number | Media)[] | null
   display?: {
     featured?: boolean | null
@@ -688,10 +689,10 @@ export interface MediaSelect<T extends boolean = true> {
 export interface ProjectsSelect<T extends boolean = true> {
   title?: T
   slug?: T
-  clientName?: T
+  client_name?: T
   status?: T
-  businessChallenge?: T
-  contributionHighlights?:
+  business_challenge?: T
+  contribution_highlights?:
     | T
     | {
         statement?: T
@@ -711,10 +712,11 @@ export interface ProjectsSelect<T extends boolean = true> {
     | {
         technologies?: T
       }
-  liveLink?: T
-  snapshotLink?: T
-  githubLink?: T
+  live_link?: T
+  snapshot_link?: T
+  github_link?: T
   thumbnail?: T
+  hero_image?: T
   images?: T
   display?:
     | T

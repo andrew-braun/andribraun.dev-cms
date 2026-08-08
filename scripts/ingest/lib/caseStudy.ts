@@ -3,12 +3,12 @@ import type { JsonSchema } from '@/app/lib/ai/claude'
 export type ProjectStatus = 'archived' | 'completed' | 'live' | 'ongoing'
 
 export type CaseStudyFieldKey =
-  'businessChallenge' | 'clientName' | 'contributionHighlights' | 'outcomes' | 'status'
+  'business_challenge' | 'client_name' | 'contribution_highlights' | 'outcomes' | 'status'
 
 export const CASE_STUDY_FIELD_KEYS: CaseStudyFieldKey[] = [
-  'clientName',
-  'businessChallenge',
-  'contributionHighlights',
+  'client_name',
+  'business_challenge',
+  'contribution_highlights',
   'outcomes',
   'status',
 ]
@@ -16,9 +16,9 @@ export const CASE_STUDY_FIELD_KEYS: CaseStudyFieldKey[] = [
 export const PROJECT_STATUSES: ProjectStatus[] = ['live', 'ongoing', 'completed', 'archived']
 
 export interface CaseStudySidecar {
-  businessChallenge?: string
-  clientName?: string
-  contributionHighlights?: { statement: string }[]
+  business_challenge?: string
+  client_name?: string
+  contribution_highlights?: { statement: string }[]
   needsReview: CaseStudyFieldKey[]
   outcomes?: { metric?: string; statement: string }[]
   status?: ProjectStatus
@@ -28,9 +28,9 @@ export const caseStudyOutputSchema: JsonSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    businessChallenge: { type: 'string' },
-    clientName: { type: 'string' },
-    contributionHighlights: {
+    business_challenge: { type: 'string' },
+    client_name: { type: 'string' },
+    contribution_highlights: {
       type: 'array',
       items: {
         type: 'object',
@@ -85,16 +85,16 @@ export function normalizeCaseStudy(raw: unknown): CaseStudySidecar {
   const input = raw as Record<string, unknown>
   const result: CaseStudySidecar = { needsReview: [] }
 
-  if (typeof input.clientName === 'string' && input.clientName.trim()) {
-    result.clientName = input.clientName.trim()
+  if (typeof input.client_name === 'string' && input.client_name.trim()) {
+    result.client_name = input.client_name.trim()
   }
 
-  if (typeof input.businessChallenge === 'string' && input.businessChallenge.trim()) {
-    result.businessChallenge = input.businessChallenge.trim()
+  if (typeof input.business_challenge === 'string' && input.business_challenge.trim()) {
+    result.business_challenge = input.business_challenge.trim()
   }
 
-  if (Array.isArray(input.contributionHighlights)) {
-    const highlights = input.contributionHighlights
+  if (Array.isArray(input.contribution_highlights)) {
+    const highlights = input.contribution_highlights
       .map((row) => {
         if (!row || typeof row !== 'object') {
           return null
@@ -107,7 +107,7 @@ export function normalizeCaseStudy(raw: unknown): CaseStudySidecar {
       })
       .filter((row): row is { statement: string } => row !== null)
     if (highlights.length > 0) {
-      result.contributionHighlights = highlights
+      result.contribution_highlights = highlights
     }
   }
 
@@ -141,14 +141,14 @@ export function normalizeCaseStudy(raw: unknown): CaseStudySidecar {
   const fromModel = Array.isArray(input.needsReview) ? input.needsReview.filter(isFieldKey) : []
 
   const missing: CaseStudyFieldKey[] = []
-  if (!result.clientName) {
-    missing.push('clientName')
+  if (!result.client_name) {
+    missing.push('client_name')
   }
-  if (!result.businessChallenge) {
-    missing.push('businessChallenge')
+  if (!result.business_challenge) {
+    missing.push('business_challenge')
   }
-  if (!result.contributionHighlights) {
-    missing.push('contributionHighlights')
+  if (!result.contribution_highlights) {
+    missing.push('contribution_highlights')
   }
   if (!result.outcomes) {
     missing.push('outcomes')

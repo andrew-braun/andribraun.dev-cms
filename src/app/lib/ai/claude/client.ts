@@ -27,9 +27,11 @@ export interface JsonSchema {
 export interface ClaudeRequestOptions {
   /** Thinking depth / token spend. Only supported on Claude 4.5+ models. */
   effort?: 'high' | 'low' | 'max' | 'medium' | 'xhigh'
+  fetchImpl?: typeof fetch
   maxTokens?: number
   model?: string
   outputSchema?: JsonSchema
+  signal?: AbortSignal
   system?: string
 }
 
@@ -67,7 +69,15 @@ export async function sendMessage(
   messages: ClaudeMessage[],
   options: ClaudeRequestOptions = {},
 ): Promise<ClaudeResponse> {
-  const { effort, maxTokens = 1024, model = DEFAULT_MODEL, outputSchema, system } = options
+  const {
+    effort,
+    fetchImpl = fetch,
+    maxTokens = 1024,
+    model = DEFAULT_MODEL,
+    outputSchema,
+    signal,
+    system,
+  } = options
 
   const body: Record<string, unknown> = {
     max_tokens: maxTokens,
@@ -101,15 +111,39 @@ export async function sendMessage(
     throw new ClaudeAPIError('CLAUDE_API_KEY environment variable is not set')
   }
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    body: JSON.stringify(body),
-    headers: {
-      'anthropic-version': ANTHROPIC_VERSION,
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-    },
-    method: 'POST',
-  })
+  const controller = new AbortController()
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    controller.abort(new Error('timeout'))
+  }, 90_000)
+  const abort = () => controller.abort(signal?.reason)
+  signal?.addEventListener('abort', abort, { once: true })
+  if (signal?.aborted) {
+    abort()
+  }
+
+  let response: Response
+  try {
+    response = await fetchImpl(ANTHROPIC_API_URL, {
+      body: JSON.stringify(body),
+      headers: {
+        'anthropic-version': ANTHROPIC_VERSION,
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      method: 'POST',
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (timedOut) {
+      throw new ClaudeAPIError('Anthropic request timed out after 90000ms')
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', abort)
+  }
 
   if (!response.ok) {
     const errorBody = await response.text()

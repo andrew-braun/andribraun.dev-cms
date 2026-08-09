@@ -1,0 +1,11 @@
+# Deployed site URLs to ingest, one per line. Lines starting with # are ignored.
+# Run: pnpm ingest discover --urls=ingest/urls.txt
+#
+# A URL that matches a GitHub repo's homepage is linked to that repo
+# automatically, so you don't need to list a project in both places.
+
+# WordPress sites
+https://yourmove.ge
+https://allpointsadvising.com
+https://expatfinancial.solutions
+https://entity.inc

@@ -2,11 +2,11 @@ import fs from 'fs/promises'
 
 import type { ManifestEntry } from '../lib/types'
 
-import { flagNumber, flagValue, hasFlag, type ParsedArgs } from '../lib/args'
+import { flagBoolean, flagNumber, flagValue, type ParsedArgs } from '../lib/args'
 import { assertGhReady, listRepos } from '../lib/github'
 import { IngestError, log } from '../lib/log'
 import { loadManifest, saveManifest, slugify, uniqueSlug } from '../lib/manifest'
-import { MANIFEST_PATH, rel } from '../lib/paths'
+import { MANIFEST_PATH, rel, resolveContained, ROOT } from '../lib/paths'
 
 /**
  * Seeds or refreshes the manifest from your GitHub account and/or a list of
@@ -48,14 +48,14 @@ export async function discover(args: ParsedArgs): Promise<void> {
   }
 
   // --- GitHub ----------------------------------------------------------
-  if (!hasFlag(args, 'no-github')) {
+  if (!(flagBoolean(args, 'no-github') ?? false)) {
     await assertGhReady()
 
     const owner = flagValue(args, 'owner')
-    const limit = flagNumber(args, 'limit') ?? 300
-    const includeForks = hasFlag(args, 'forks')
-    const includeArchived = hasFlag(args, 'archived')
-    const unskipAll = hasFlag(args, 'all')
+    const limit = flagNumber(args, 'limit', { integer: true, max: 1000, min: 1 }) ?? 300
+    const includeForks = flagBoolean(args, 'forks') ?? false
+    const includeArchived = flagBoolean(args, 'archived') ?? false
+    const unskipAll = flagBoolean(args, 'all') ?? false
 
     log.detail(`Listing repos for ${owner ?? 'the authenticated account'}...`)
     const repos = await listRepos(owner, limit)
@@ -141,7 +141,7 @@ async function collectUrls(args: ParsedArgs): Promise<string[]> {
   if (file) {
     let contents: string
     try {
-      contents = await fs.readFile(file, 'utf8')
+      contents = await fs.readFile(resolveContained(ROOT, file), 'utf8')
     } catch {
       throw new IngestError(`Could not read the URL list at ${file}`)
     }

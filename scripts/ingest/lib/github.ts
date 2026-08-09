@@ -1,11 +1,8 @@
 import { execFile } from 'child_process'
-import { promisify } from 'util'
 
 import type { RepoContext } from './types'
 
 import { IngestError, log } from './log'
-
-const run = promisify(execFile)
 
 /** Max characters kept per fetched file, so one huge lockfile can't dominate. */
 const MAX_FILE_CHARS = 12_000
@@ -61,19 +58,53 @@ export interface DiscoveredRepo {
   visibility: string
 }
 
-async function gh(args: string[]): Promise<string> {
-  try {
-    const { stdout } = await run('gh', args, { maxBuffer: 32 * 1024 * 1024 })
-    return stdout
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    throw new IngestError(`gh ${args.slice(0, 2).join(' ')} failed: ${message}`)
+type Exec = typeof execFile
+
+function readOnlyGh(args: string[]): boolean {
+  return (
+    args[0] === 'api' ||
+    (args[0] === 'repo' && args[1] === 'list') ||
+    (args[0] === 'auth' && args[1] === 'status')
+  )
+}
+
+export async function runGh(args: string[], exec: Exec = execFile): Promise<string> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await new Promise<string>((resolve, reject) => {
+        exec(
+          'gh',
+          args,
+          { killSignal: 'SIGTERM', maxBuffer: 32 * 1024 * 1024, timeout: 30_000 },
+          (error, stdout) => {
+            if (error) {
+              reject(new Error(error.message))
+            } else {
+              resolve(String(stdout))
+            }
+          },
+        )
+      })
+    } catch (error) {
+      const timeout =
+        (error as { killed?: boolean } & NodeJS.ErrnoException).code === 'ETIMEDOUT' ||
+        (error as { killed?: boolean }).killed
+      if (timeout) {
+        throw new IngestError(`gh ${args.slice(0, 2).join(' ')} timed out after 30000ms`)
+      }
+      if (readOnlyGh(args) && attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 150 : 450))
+        continue
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      throw new IngestError(`gh ${args.slice(0, 2).join(' ')} failed: ${message}`)
+    }
   }
 }
 
 export async function assertGhReady(): Promise<void> {
   try {
-    await run('gh', ['auth', 'status'])
+    await runGh(['auth', 'status'])
   } catch {
     throw new IngestError(
       'GitHub CLI is not authenticated. Run `gh auth login` before using this stage.',
@@ -83,8 +114,8 @@ export async function assertGhReady(): Promise<void> {
 
 /** Lists repos for a user (defaults to the authenticated account). */
 export async function listRepos(owner?: string, limit = 300): Promise<DiscoveredRepo[]> {
-  const target = owner ?? (await gh(['api', 'user', '--jq', '.login'])).trim()
-  const stdout = await gh([
+  const target = owner ?? (await runGh(['api', 'user', '--jq', '.login'])).trim()
+  const stdout = await runGh([
     'repo',
     'list',
     target,
@@ -134,7 +165,7 @@ export function normalizeRepo(input: string): string {
 
 async function fetchFile(repo: string, path: string): Promise<string | undefined> {
   try {
-    const stdout = await gh([
+    const stdout = await runGh([
       'api',
       `repos/${repo}/contents/${encodeURI(path)}`,
       '--jq',
@@ -157,7 +188,7 @@ export async function gatherRepoContext(repoInput: string): Promise<RepoContext>
   const repo = normalizeRepo(repoInput)
 
   const meta = JSON.parse(
-    await gh([
+    await runGh([
       'api',
       `repos/${repo}`,
       '--jq',
@@ -171,14 +202,14 @@ export async function gatherRepoContext(repoInput: string): Promise<RepoContext>
     topics?: string[]
   }
 
-  const languages = JSON.parse(await gh(['api', `repos/${repo}/languages`])) as Record<
+  const languages = JSON.parse(await runGh(['api', `repos/${repo}/languages`])) as Record<
     string,
     number
   >
 
   let tree: string[] = []
   try {
-    const stdout = await gh([
+    const stdout = await runGh([
       'api',
       `repos/${repo}/git/trees/${meta.default_branch}?recursive=1`,
       '--jq',

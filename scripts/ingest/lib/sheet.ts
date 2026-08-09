@@ -4,6 +4,7 @@ import path from 'path'
 import type { CaseStudySidecar } from './caseStudy'
 import type { CapturedShot, ManifestEntry } from './types'
 
+import { atomicWriteFile } from './artifacts'
 import { CASE_STUDY_FIELD_KEYS } from './caseStudy'
 import { readJson } from './manifest'
 import { caseStudyPath, entryDir, rel, shotsDir, shotsManifestPath, writeupPath } from './paths'
@@ -47,9 +48,9 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
     '| --- | --- |',
     `| title | \`${entry.title}\` |`,
     `| slug | \`${entry.slug}\` |`,
-    `| links → live_link | ${code(entry.liveUrl)} |`,
-    `| links → github_link | ${code(entry.githubLink)} |`,
-    `| links → snapshot_link | ${code(entry.snapshotLink)} |`,
+    `| links → live_link | ${code(entry.liveUrl ?? undefined)} |`,
+    `| links → github_link | ${code(entry.githubLink ?? undefined)} |`,
+    `| links → snapshot_link | ${code(entry.snapshotLink ?? undefined)} |`,
     `| display → card_type | \`${entry.cardType ?? 'visual'}\` |`,
     `| display → featured | \`${entry.featured ?? false}\` |`,
     `| display → order | ${code(entry.order === undefined ? undefined : String(entry.order))} |`,
@@ -123,7 +124,7 @@ export async function writeSheet(entry: ManifestEntry): Promise<null | string> {
 
   const target = path.join(dir, 'ENTER-ME.md')
   await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(target, `${lines.join('\n')}\n`, 'utf8')
+  await atomicWriteFile(target, `${lines.join('\n')}\n`)
   return target
 }
 

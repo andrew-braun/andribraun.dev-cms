@@ -1,5 +1,7 @@
 import type { SiteProbe } from './types'
 
+import { fetchRead } from './transport'
+
 /**
  * Markers in the served HTML that identify a framework, host, or service. These
  * only inform the write-up — the model is told to treat them as hints.
@@ -91,19 +93,10 @@ function extractNavLinks(html: string, base: string): string[] {
  * hints, and same-origin navigation links.
  */
 export async function probeSite(url: string): Promise<SiteProbe> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 20_000)
-
   try {
-    const response = await fetch(url, {
+    const response = await fetchRead(url, {
       headers: { 'user-agent': USER_AGENT },
-      redirect: 'follow',
-      signal: controller.signal,
     })
-
-    if (!response.ok) {
-      return { navLinks: [], ok: false, reason: `HTTP ${response.status}`, signals: [], url }
-    }
 
     const finalUrl = response.url || url
     const html = await response.text()
@@ -135,7 +128,5 @@ export async function probeSite(url: string): Promise<SiteProbe> {
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
     return { navLinks: [], ok: false, reason, signals: [], url }
-  } finally {
-    clearTimeout(timeout)
   }
 }

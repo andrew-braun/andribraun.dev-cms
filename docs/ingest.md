@@ -93,8 +93,51 @@ appends newly-seen repos and URLs; it never overwrites your edits.
 }
 ```
 
-`stages` timestamps are what make the pipeline resumable — a stage skips
-entries it has already completed. Pass `--force` to redo one.
+`stages` timestamps and SHA-256 input fingerprints make the pipeline resumable.
+A stage skips only when its required artifact exists and its recorded inputs
+still match. Pass `--force` to redo one.
+
+The manifest is validated completely before a command writes. Slugs must be
+lowercase hyphenated names, URLs must use HTTP(S), screenshot filenames must be
+contained basenames, and duplicate slugs or malformed values stop the command
+with a nonzero exit code.
+
+### Omission and explicit clearing
+
+Publish updates are partial: omitted fields preserve the values already in the
+CMS. Concrete values replace them, while explicit `null` clears nullable fields.
+For example:
+
+```json
+{
+  "slug": "old-project",
+  "liveUrl": null,
+  "githubLink": null,
+  "snapshotLink": null,
+  "screenshots": null
+}
+```
+
+This clears the three links and existing media relationships on the next
+update. Leaving those keys out preserves hand-edited links and media. New
+projects still receive safe display defaults: visual card, not featured, and
+hidden.
+
+### Generated-artifact invalidation
+
+Input fingerprints invalidate only dependent generated work:
+
+| Changed input                                  | Invalidated output                          |
+| ---------------------------------------------- | ------------------------------------------- |
+| `liveUrl`                                      | analysis, screenshots, write-up, case study |
+| `repo` or `githubLink`                         | analysis, write-up, case study              |
+| screenshot targets, hero, title, or `maxShots` | screenshots, write-up, case study           |
+| authored notes                                 | write-up and case study                     |
+| snapshot link, ordering, or display metadata   | nothing generated                           |
+
+Invalidation deletes stale generated artifacts and clears their stage state;
+it never deletes `manifest.json`, `urls.txt`, or authored notes. Regeneration is
+explicit rather than automatic.
 
 Entries also grow a `publishedTo` map once you use the
 [`publish` command](#the-publish-command); the manual workflow never writes it.
@@ -208,6 +251,11 @@ capture it dismisses cookie/consent overlays, scrolls the full page to trigger
 lazy-loaded imagery, returns to the top, disables animations, and waits for
 fonts. Alt text is generated per image by Claude vision (`--no-alt` to skip).
 
+Captures are built and validated in a temporary sibling directory. Every target
+must succeed, every file must be a nonempty PNG with the expected dimensions,
+and exactly one capture must be the hero. Only then are the directory and
+`shots.json` swapped into place; a failed run preserves the previous valid set.
+
 Targets come from `screenshots` in the manifest when set; otherwise the homepage
 plus same-origin nav routes discovered during `analyze`, capped at `maxShots`
 (default 5). Pages behind a login can't be captured — pin public URLs instead.
@@ -282,6 +330,7 @@ pnpm ingest remote ping                     # check the URL and key first
 pnpm ingest publish --remote --dry-run      # report, write nothing
 pnpm ingest publish --remote talkspark      # one entry, created hidden
 pnpm ingest publish --remote --visible      # everything ready, live immediately
+pnpm ingest publish --remote --visible=false # explicitly hide on create or update
 ```
 
 Notes that apply to both modes:
@@ -298,7 +347,15 @@ Notes that apply to both modes:
   **updates an existing project** rather than colliding on the unique
   constraint — so a project you already entered by hand gets adopted, not
   duplicated.
-- Projects are created with `display.hide` set unless you pass `--visible`.
+- Projects are created hidden unless you pass `--visible` or `--visible=true`.
+  On updates, omitting the flag preserves visibility; `--visible=false`
+  explicitly hides the existing project.
+- A recorded project ID is verified against its slug before any upload. Missing
+  or stale IDs fall back to slug lookup; an ID belonging to another slug is a
+  hard failure.
+- Independent entries continue after a failure, but any hard failure makes the
+  overall command exit nonzero. Technology extraction is independently
+  rerunnable, so its failure is a warning after the project write is recorded.
 - `publishedTo` in the manifest is keyed by target — `host:port/name` for a
   database, `remote:<host>` for an instance — so a project ID recorded against
   dev is never used to update a row in prod.
@@ -310,6 +367,11 @@ Notes that apply to both modes:
 
 Flags: `--remote`, `--dry-run`, `--visible`, `--no-tech` (skip technology
 extraction).
+
+Boolean flags accept bare, `=true`, and `=false` forms only. Numeric flags are
+finite bounded integers. Site and CMS reads time out and retry only when they
+are idempotent; uploads, creates, updates, deletes, and Anthropic requests time
+out without automatic retry.
 
 ## Reaching the remote instance directly
 

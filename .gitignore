@@ -52,6 +52,5 @@ node_modules/
 # Secrets
 /secrets
 
-# Ingest pipeline working files (screenshots, contexts, generated write-ups).
-# ingest/manifest.json and ingest/urls.txt are intentionally tracked.
-/ingest
+# Generated ingest artifacts; authored manifest, URL lists, and notes are tracked.
+/ingest/work/

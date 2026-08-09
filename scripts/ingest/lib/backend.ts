@@ -10,14 +10,12 @@
  * Both are driven through one interface so `publish` has a single code path.
  */
 
-import type { RequiredDataFromCollectionSlug } from 'payload'
+import type { ProjectCreateData, ProjectUpdateData } from './projectData'
+import type { ProjectIdentity } from './projectResolution'
+import type { RemoteClient, UploadFile } from './remote'
 
-import type { UploadFile } from './remote'
-
-import { createRemoteClient } from './remote'
+import { createRemoteClient, RemoteHTTPError } from './remote'
 import { currentTarget, remoteTarget } from './target'
-
-export type ProjectData = RequiredDataFromCollectionSlug<'projects'>
 
 export interface TechExtractionResult {
   created: string[]
@@ -28,7 +26,8 @@ export interface TechExtractionResult {
 }
 
 export interface PublishBackend {
-  createProject(data: ProjectData): Promise<number>
+  close(): Promise<void>
+  createProject(data: ProjectCreateData): Promise<number>
   /** Human-readable destination, printed before anything is written. */
   readonly description: string
   extractTechnologies(projectId: number): Promise<TechExtractionResult>
@@ -37,10 +36,11 @@ export interface PublishBackend {
    * project that was entered by hand, rather than failing on the unique
    * constraint or creating a duplicate.
    */
-  findProjectBySlug(slug: string): Promise<null | number>
+  findProjectById(id: number): Promise<null | ProjectIdentity>
+  findProjectBySlug(slug: string): Promise<null | ProjectIdentity>
   /** Manifest key the resulting project ID is recorded under. */
   readonly target: string
-  updateProject(id: number, data: ProjectData): Promise<number>
+  updateProject(id: number, data: ProjectUpdateData): Promise<number>
   uploadMedia(alt: string, file: UploadFile): Promise<number>
 }
 
@@ -61,6 +61,9 @@ export async function localBackend(): Promise<PublishBackend> {
   const target = currentTarget()
 
   return {
+    async close() {
+      await payload.destroy()
+    },
     async createProject(data) {
       const created = await payload.create({ collection: 'projects', data })
       return created.id
@@ -69,6 +72,17 @@ export async function localBackend(): Promise<PublishBackend> {
     async extractTechnologies(projectId) {
       return await extractTechnologiesFromProject(projectId, payload)
     },
+    async findProjectById(id) {
+      try {
+        const project = await payload.findByID({ id, collection: 'projects', depth: 0 })
+        return typeof project.slug === 'string' ? { id: project.id, slug: project.slug } : null
+      } catch (error) {
+        if ((error as { status?: number }).status === 404) {
+          return null
+        }
+        throw error
+      }
+    },
     async findProjectBySlug(slug) {
       const result = await payload.find({
         collection: 'projects',
@@ -76,7 +90,10 @@ export async function localBackend(): Promise<PublishBackend> {
         limit: 1,
         where: { slug: { equals: slug } },
       })
-      return result.docs[0]?.id ?? null
+      const project = result.docs[0]
+      return project && typeof project.slug === 'string'
+        ? { id: project.id, slug: project.slug }
+        : null
     },
     target,
     async updateProject(id, data) {
@@ -100,11 +117,11 @@ export async function localBackend(): Promise<PublishBackend> {
 }
 
 /** Publishes over the REST API of a running instance, e.g. production. */
-export function remoteBackend(): PublishBackend {
-  const client = createRemoteClient()
+export function remoteBackend(client: RemoteClient = createRemoteClient()): PublishBackend {
   const target = remoteTarget(client.host)
 
   return {
+    async close() {},
     async createProject(data) {
       const created = await client.create('projects', data)
       return created.id
@@ -128,13 +145,27 @@ export function remoteBackend(): PublishBackend {
         }
       }
     },
+    async findProjectById(id) {
+      try {
+        const project = await client.findByID('projects', id, { depth: 0 })
+        return typeof project.slug === 'string' ? { id: project.id, slug: project.slug } : null
+      } catch (error) {
+        if (error instanceof RemoteHTTPError && error.status === 404) {
+          return null
+        }
+        throw error
+      }
+    },
     async findProjectBySlug(slug) {
       const result = await client.find('projects', {
         depth: 0,
         limit: 1,
         where: { slug: { equals: slug } },
       })
-      return result.docs[0]?.id ?? null
+      const project = result.docs[0]
+      return project && typeof project.slug === 'string'
+        ? { id: project.id, slug: project.slug }
+        : null
     },
     target,
     async updateProject(id, data) {

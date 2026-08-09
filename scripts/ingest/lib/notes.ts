@@ -2,6 +2,7 @@ import fs from 'fs/promises'
 
 import type { ManifestEntry } from './types'
 
+import { atomicWriteFile } from './artifacts'
 import { NOTES_DIR, notesPath } from './paths'
 
 /**
@@ -81,6 +82,6 @@ export async function scaffoldNotes(entry: ManifestEntry): Promise<null | string
   ]
 
   await fs.mkdir(NOTES_DIR, { recursive: true })
-  await fs.writeFile(target, lines.join('\n'), 'utf8')
+  await atomicWriteFile(target, lines.join('\n'))
   return target
 }

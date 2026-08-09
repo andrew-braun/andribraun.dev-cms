@@ -1,22 +1,21 @@
-import fs from 'fs/promises'
-import path from 'path'
 import { chromium, type Page } from 'playwright'
 
 import type { CapturedShot, EntryContext, ManifestEntry, ShotSpec } from '../lib/types'
 
 import { generateAltText } from '../lib/ai'
-import { flagNumber, hasFlag, type ParsedArgs } from '../lib/args'
-import { log } from '../lib/log'
+import { flagBoolean, flagNumber, type ParsedArgs } from '../lib/args'
 import {
-  loadManifest,
-  readJson,
-  safeFilename,
-  selectEntries,
-  updateEntry,
-  writeJson,
-} from '../lib/manifest'
-import { contextPath, rel, shotsDir, shotsManifestPath } from '../lib/paths'
+  reconcileEntryArtifacts,
+  recordStageCompletion,
+  replaceArtifactSet,
+} from '../lib/artifacts'
+import { runBatch } from '../lib/batch'
+import { IngestError, log } from '../lib/log'
+import { loadManifest, readJson, safeFilename, selectEntries } from '../lib/manifest'
+import { readNotes } from '../lib/notes'
+import { contextPath, rel, resolveContained, shotsDir, shotsManifestPath } from '../lib/paths'
 import { writeSheet } from '../lib/sheet'
+import { assertPublicHttpUrl } from '../lib/transport'
 
 /**
  * Viewport is half the output size and the device scale factor doubles it, so
@@ -42,18 +41,14 @@ const DISMISS_SELECTORS = [
 
 export async function shots(args: ParsedArgs): Promise<void> {
   const manifest = await loadManifest()
-  const entries = selectEntries(manifest, args.positionals)
-  const force = hasFlag(args, 'force')
-  const skipAlt = hasFlag(args, 'no-alt')
-  const maxOverride = flagNumber(args, 'max')
+  const selected = selectEntries(manifest, args.positionals)
+  const force = flagBoolean(args, 'force') ?? false
+  const skipAlt = flagBoolean(args, 'no-alt') ?? false
+  const maxOverride = flagNumber(args, 'max', { integer: true, max: 20, min: 1 })
 
-  const todo = entries.filter((entry) => {
+  const todo = selected.filter((entry) => {
     if (!entry.liveUrl) {
       log.detail(`${entry.slug}: no liveUrl — skipping screenshots`)
-      return false
-    }
-    if (!force && entry.stages.shotsAt) {
-      log.detail(`${entry.slug}: screenshots already captured (--force to redo)`)
       return false
     }
     return true
@@ -76,6 +71,14 @@ export async function shots(args: ParsedArgs): Promise<void> {
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     viewport: VIEWPORT,
   })
+  await context.route('**/*', async (route) => {
+    try {
+      await assertPublicHttpUrl(route.request().url())
+      await route.continue()
+    } catch {
+      await route.abort('blockedbyclient')
+    }
+  })
   // Animations mid-flight produce inconsistent frames between runs.
   await context.addInitScript(() => {
     const style = document.createElement('style')
@@ -85,7 +88,13 @@ export async function shots(args: ParsedArgs): Promise<void> {
   })
 
   try {
-    for (const entry of todo) {
+    await runBatch(todo, async (selectedEntry) => {
+      const notes = await readNotes(selectedEntry.slug)
+      const entry = await reconcileEntryArtifacts(selectedEntry.slug, notes)
+      if (!force && entry.stages.shotsAt) {
+        log.detail(`${entry.slug}: screenshots already captured (--force to redo)`)
+        return
+      }
       log.step(`Capturing ${entry.slug}`)
 
       const targets = await resolveTargets(entry, maxOverride)
@@ -101,64 +110,66 @@ export async function shots(args: ParsedArgs): Promise<void> {
 
       if (targets.length === 0) {
         log.warn(`${entry.slug}: no capturable URLs`)
-        continue
+        return
       }
 
       const outDir = shotsDir(entry.slug)
-      await fs.rm(outDir, { force: true, recursive: true })
-      await fs.mkdir(outDir, { recursive: true })
+      let captured: CapturedShot[] = []
+      await replaceArtifactSet({
+        build: async (staging) => {
+          const page = await context.newPage()
+          captured = []
+          try {
+            for (const target of targets) {
+              await settle(page, target.url)
 
-      const captured: CapturedShot[] = []
-      const page = await context.newPage()
+              const file = `${safeFilename(`${entry.title} - ${target.label}`)}.png`
+              const filePath = resolveContained(staging.dir, file)
+              await page.screenshot({ type: 'png', path: filePath })
 
-      for (const target of targets) {
-        try {
-          await settle(page, target.url)
+              let alt = `${entry.title} — ${target.label}`
+              if (!skipAlt && process.env.CLAUDE_API_KEY) {
+                alt = await generateAltText(filePath, entry.title, target.label)
+              }
 
-          const file = `${safeFilename(`${entry.title} - ${target.label}`)}.png`
-          const filePath = path.join(outDir, file)
-          await page.screenshot({ type: 'png', path: filePath })
-
-          let alt = `${entry.title} — ${target.label}`
-          if (!skipAlt && process.env.CLAUDE_API_KEY) {
-            alt = await generateAltText(filePath, entry.title, target.label)
+              captured.push({
+                alt,
+                file,
+                height: VIEWPORT.height * SCALE,
+                label: target.label,
+                url: target.url,
+                width: VIEWPORT.width * SCALE,
+              })
+              log.ok(`${file}`)
+              log.detail(alt)
+            }
+          } finally {
+            await page.close()
           }
 
-          captured.push({
-            alt,
-            file,
-            height: VIEWPORT.height * SCALE,
-            label: target.label,
-            url: target.url,
-            width: VIEWPORT.width * SCALE,
-          })
-          log.ok(`${file}`)
-          log.detail(alt)
-        } catch (error) {
-          log.error(`${target.url}: ${error instanceof Error ? error.message : String(error)}`)
-        }
-      }
-
-      await page.close()
-
-      if (captured.length === 0) {
-        log.warn(`${entry.slug}: every capture failed`)
-        continue
-      }
-
-      // Fall back to the first successful capture so `hero_image` is never
-      // empty — a failed hero shot shouldn't leave the field unset.
-      const heroShot = captured.find((shot) => sameRoute(shot.url, hero.url)) ?? captured[0]
-      heroShot.hero = true
-      log.detail(`hero_image → ${heroShot.file}`)
-
-      await writeJson(shotsManifestPath(entry.slug), captured)
-      await updateEntry(entry.slug, (target) => {
-        target.stages.shotsAt = new Date().toISOString()
+          if (captured.length !== targets.length) {
+            throw new IngestError(
+              `${entry.slug}: captured ${captured.length}/${targets.length}; previous screenshots preserved`,
+            )
+          }
+          const heroShot = captured.find((shot) => sameRoute(shot.url, hero.url)) ?? captured[0]
+          heroShot.hero = true
+          log.detail(`hero_image → ${heroShot.file}`)
+          return captured
+        },
+        targetDir: outDir,
+        targetManifest: shotsManifestPath(entry.slug),
       })
-      await writeSheet(entry)
+
+      const completed = await recordStageCompletion(
+        entry.slug,
+        'shots',
+        new Date().toISOString(),
+        notes,
+      )
+      await writeSheet(completed)
       log.info(`${captured.length} screenshots → ${rel(outDir)}`)
-    }
+    })
   } finally {
     await browser.close()
   }
@@ -169,7 +180,15 @@ export async function shots(args: ParsedArgs): Promise<void> {
 
 /** Navigates, waits for the page to stop moving, and clears overlays. */
 async function settle(page: Page, url: string): Promise<void> {
-  await page.goto(url, { timeout: 45_000, waitUntil: 'domcontentloaded' })
+  await assertPublicHttpUrl(url)
+  try {
+    await page.goto(url, { timeout: 45_000, waitUntil: 'domcontentloaded' })
+  } catch (error) {
+    throw new IngestError(
+      `Navigation to ${url} failed within 45000ms: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+  await assertPublicHttpUrl(page.url())
 
   // `networkidle` frequently never fires on sites with polling or live chat, so
   // treat it as best-effort rather than a hard requirement.

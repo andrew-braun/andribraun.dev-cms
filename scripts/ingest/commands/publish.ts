@@ -1,17 +1,158 @@
 import fs from 'fs/promises'
-import path from 'path'
 
 import type { PublishBackend } from '../lib/backend'
 import type { CaseStudySidecar } from '../lib/caseStudy'
-import type { CapturedShot } from '../lib/types'
+import type { ProjectResolution } from '../lib/projectResolution'
+import type { CapturedShot, ManifestEntry } from '../lib/types'
 
-import { hasFlag, type ParsedArgs } from '../lib/args'
-import { localBackend, remoteBackend, resolveTarget } from '../lib/backend'
+import { flagBoolean, type ParsedArgs } from '../lib/args'
+import { localBackend, remoteBackend } from '../lib/backend'
+import { runBatch } from '../lib/batch'
 import { log } from '../lib/log'
 import { loadManifest, readJson, selectEntries, updateEntry } from '../lib/manifest'
-import { caseStudyPath, shotsDir, shotsManifestPath, writeupPath } from '../lib/paths'
-import { buildProjectData } from '../lib/projectData'
+import {
+  caseStudyPath,
+  resolveContained,
+  shotsDir,
+  shotsManifestPath,
+  writeupPath,
+} from '../lib/paths'
+import { buildProjectCreateData, buildProjectUpdateData } from '../lib/projectData'
+import { resolveProject } from '../lib/projectResolution'
+import { validateCapturedShots } from '../lib/validation'
 import { splitWriteup, WRITEUP_SECTION_KEYS } from '../lib/writeupSections'
+
+interface LoadedShot extends CapturedShot {
+  data: Buffer
+}
+
+interface PublishEntryDependencies {
+  loadAndValidateArtifacts(entry: ManifestEntry): Promise<{
+    caseStudy: CaseStudySidecar | null
+    markdown: string
+    shots: LoadedShot[]
+  }>
+  recordPublished(
+    entry: ManifestEntry,
+    backend: PublishBackend,
+    id: number,
+    at: string,
+  ): Promise<unknown>
+  resolve(backend: PublishBackend, slug: string, hintedId?: number): Promise<ProjectResolution>
+}
+
+const defaultPublishDependencies: PublishEntryDependencies = {
+  async loadAndValidateArtifacts(entry) {
+    const markdown = (await fs.readFile(writeupPath(entry.slug), 'utf8')).trim()
+    const shots = (await readJson<CapturedShot[]>(shotsManifestPath(entry.slug))) ?? []
+    const caseStudy = await readJson<CaseStudySidecar>(caseStudyPath(entry.slug))
+    if (shots.length > 0) {
+      await validateCapturedShots(shots, shotsDir(entry.slug))
+    }
+    const loaded: LoadedShot[] = await Promise.all(
+      shots.map(async (shot) => ({
+        ...shot,
+        data: await fs.readFile(resolveContained(shotsDir(entry.slug), shot.file)),
+      })),
+    )
+    return { caseStudy, markdown, shots: loaded }
+  },
+  async recordPublished(entry, backend, id, at) {
+    await updateEntry(entry.slug, (record) => {
+      record.publishedTo ??= {}
+      record.publishedTo[backend.target] = { id, at }
+    })
+  },
+  resolve: resolveProject,
+}
+
+export async function publishEntry(
+  entry: ManifestEntry,
+  options: { backend: PublishBackend; now?: () => Date; skipTech?: boolean; visibility?: boolean },
+  dependencies: PublishEntryDependencies = defaultPublishDependencies,
+): Promise<number> {
+  const { backend } = options
+  const { caseStudy, markdown, shots } = await dependencies.loadAndValidateArtifacts(entry)
+  if (!caseStudy) {
+    log.warn(`${entry.slug}: case-study.json missing — publishing without case-study fields`)
+  }
+  const split = splitWriteup(markdown)
+  const missing = WRITEUP_SECTION_KEYS.filter((key) => !split.sections[key])
+  if (missing.length > 0) {
+    log.warn(
+      `${entry.slug}: no ${missing.join(', ')} — description_markdown still holds the full write-up`,
+    )
+  }
+  for (const heading of split.unmatched) {
+    log.detail(`section "${heading}" maps to no field — it stays in description_markdown only`)
+  }
+  const resolution = await dependencies.resolve(
+    backend,
+    entry.slug,
+    entry.publishedTo?.[backend.target]?.id,
+  )
+
+  const mediaIds: number[] = []
+  let heroMediaId: number | undefined
+  for (const shot of shots) {
+    const mediaId = await backend.uploadMedia(shot.alt, {
+      name: shot.file,
+      data: shot.data,
+      mimetype: 'image/png',
+    })
+    mediaIds.push(mediaId)
+    if (shot.hero) {
+      heroMediaId = mediaId
+    }
+    log.detail(`uploaded ${shot.file} (media #${mediaId})${shot.hero ? ' — hero' : ''}`)
+  }
+
+  const input = {
+    caseStudy,
+    entry,
+    markdown,
+    media:
+      mediaIds.length > 0
+        ? { heroId: heroMediaId, ids: mediaIds }
+        : entry.screenshots === null
+          ? null
+          : undefined,
+    visibility: options.visibility,
+  }
+  const projectId =
+    resolution.action === 'update'
+      ? await backend.updateProject(resolution.id, buildProjectUpdateData(input))
+      : await backend.createProject(buildProjectCreateData(input))
+  log.ok(`${resolution.action === 'update' ? 'updated' : 'created'} project #${projectId}`)
+
+  await dependencies.recordPublished(
+    entry,
+    backend,
+    projectId,
+    (options.now ?? (() => new Date()))().toISOString(),
+  )
+
+  if (!options.skipTech) {
+    try {
+      const result = await backend.extractTechnologies(projectId)
+      if (result.success) {
+        log.ok(
+          `technologies: ${result.linked} linked${result.created.length > 0 ? `, ${result.created.length} new (${result.created.join(', ')})` : ''}`,
+        )
+      } else {
+        log.warn(`technology extraction failed: ${result.message}`)
+      }
+      for (const issue of result.errors ?? []) {
+        log.warn(issue)
+      }
+    } catch (error) {
+      log.warn(
+        `technology extraction failed: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+  }
+  return projectId
+}
 
 /**
  * Writes reviewed entries into the CMS: uploads screenshots to the media
@@ -28,10 +169,10 @@ import { splitWriteup, WRITEUP_SECTION_KEYS } from '../lib/writeupSections'
 export async function publish(args: ParsedArgs): Promise<void> {
   const manifest = await loadManifest()
   const entries = selectEntries(manifest, args.positionals)
-  const dryRun = hasFlag(args, 'dry-run')
-  const remote = hasFlag(args, 'remote')
-  const visible = hasFlag(args, 'visible')
-  const skipTech = hasFlag(args, 'no-tech')
+  const dryRun = flagBoolean(args, 'dry-run') ?? false
+  const remote = flagBoolean(args, 'remote') ?? false
+  const visibility = flagBoolean(args, 'visible')
+  const skipTech = flagBoolean(args, 'no-tech') ?? false
 
   const ready = entries.filter((entry) => {
     if (!entry.stages.writeupAt) {
@@ -47,45 +188,41 @@ export async function publish(args: ParsedArgs): Promise<void> {
   }
 
   if (dryRun) {
-    // A remote dry run can afford to tell the truth: resolving a slug is a
-    // plain GET, so it reports the real create-vs-update outcome instead of
-    // inferring it from the manifest. The local backend is deliberately left
-    // unopened — a dry run should not connect to a database at all.
-    const lookup = remote ? remoteBackend() : null
-    const target = lookup?.target ?? resolveTarget(remote)
+    const lookup = remote ? remoteBackend() : await localBackend()
+    const target = lookup.target
 
     log.banner(`Publish target: ${target}`)
     log.info('Dry run — no database or storage writes')
 
-    for (const entry of ready) {
-      const shots = (await readJson<CapturedShot[]>(shotsManifestPath(entry.slug))) ?? []
-      const markdown = await fs.readFile(writeupPath(entry.slug), 'utf8')
-      const caseStudy = await readJson<CaseStudySidecar>(caseStudyPath(entry.slug))
+    try {
+      for (const entry of ready) {
+        const shots = (await readJson<CapturedShot[]>(shotsManifestPath(entry.slug))) ?? []
+        if (shots.length > 0) {
+          await validateCapturedShots(shots, shotsDir(entry.slug))
+        }
+        const markdown = await fs.readFile(writeupPath(entry.slug), 'utf8')
+        const caseStudy = await readJson<CaseStudySidecar>(caseStudyPath(entry.slug))
+        const resolution = await resolveProject(lookup, entry.slug, entry.publishedTo?.[target]?.id)
 
-      let existingId = entry.publishedTo?.[target]?.id ?? null
-      if (existingId === null && lookup) {
-        existingId = await lookup.findProjectBySlug(entry.slug)
+        const action = resolution.action === 'create' ? 'create' : `update #${resolution.id}`
+        const found = Object.keys(splitWriteup(markdown).sections).length
+
+        // Say which way an empty capture falls, so "0 images" is never read as
+        // "the images on the target are about to go".
+        const media =
+          shots.length > 0
+            ? `${shots.length} images`
+            : resolution.action === 'create'
+              ? 'no images'
+              : 'media left as-is'
+
+        log.ok(
+          `${entry.slug}: ${action}, ${markdown.length} chars, ${media}, ${found}/${WRITEUP_SECTION_KEYS.length} sections, case-study=${caseStudy ? 'yes' : 'missing'}`,
+        )
       }
-
-      const action = existingId === null ? 'create' : `update #${existingId}`
-      const found = Object.keys(splitWriteup(markdown).sections).length
-
-      // Say which way an empty capture falls, so "0 images" is never read as
-      // "the images on the target are about to go".
-      const media =
-        shots.length > 0
-          ? `${shots.length} images`
-          : existingId === null
-            ? 'no images'
-            : 'media left as-is'
-
-      log.ok(
-        `${entry.slug}: ${action}, ${markdown.length} chars, ${media}, ${found}/${WRITEUP_SECTION_KEYS.length} sections, case-study=${caseStudy ? 'yes' : 'missing'}`,
-      )
-    }
-
-    if (lookup) {
       log.detail('"create" means no project on the target shares that slug.')
+    } finally {
+      await lookup.close()
     }
     return
   }
@@ -93,102 +230,21 @@ export async function publish(args: ParsedArgs): Promise<void> {
   const backend: PublishBackend = remote ? remoteBackend() : await localBackend()
   log.banner(`Publish target: ${backend.description}`)
 
-  for (const entry of ready) {
-    log.step(`Publishing ${entry.slug}`)
-
-    try {
-      const markdown = (await fs.readFile(writeupPath(entry.slug), 'utf8')).trim()
-      const shots = (await readJson<CapturedShot[]>(shotsManifestPath(entry.slug))) ?? []
-      const caseStudy = await readJson<CaseStudySidecar>(caseStudyPath(entry.slug))
-      if (!caseStudy) {
-        log.warn(`${entry.slug}: case-study.json missing — publishing without case-study fields`)
-      }
-
-      // Section fields are a convenience for layout; a write-up that does not
-      // follow the house structure still publishes on description_markdown.
-      const split = splitWriteup(markdown)
-      const missing = WRITEUP_SECTION_KEYS.filter((key) => !split.sections[key])
-      if (missing.length > 0) {
-        log.warn(
-          `${entry.slug}: no ${missing.join(', ')} — description_markdown still holds the full write-up`,
-        )
-      }
-      for (const heading of split.unmatched) {
-        log.detail(`section "${heading}" maps to no field — it stays in description_markdown only`)
-      }
-
-      // Resolve the destination row before uploading anything, so a project
-      // entered by hand is updated rather than colliding on the unique slug.
-      let existingId = entry.publishedTo?.[backend.target]?.id ?? null
-      if (existingId === null) {
-        existingId = await backend.findProjectBySlug(entry.slug)
-        if (existingId !== null) {
-          log.detail(
-            `found existing project #${existingId} with slug "${entry.slug}" — updating it`,
-          )
-        }
-      }
-
-      const mediaIds: number[] = []
-      let heroMediaId: number | undefined
-      for (const shot of shots) {
-        const filePath = path.join(shotsDir(entry.slug), shot.file)
-        const data = await fs.readFile(filePath)
-
-        const mediaId = await backend.uploadMedia(shot.alt, {
-          name: shot.file,
-          data,
-          mimetype: 'image/png',
-        })
-        mediaIds.push(mediaId)
-        if (shot.hero) {
-          heroMediaId = mediaId
-        }
-        log.detail(`uploaded ${shot.file} (media #${mediaId})${shot.hero ? ' — hero' : ''}`)
-      }
-
-      const data = buildProjectData(entry, markdown, mediaIds, visible, caseStudy, heroMediaId)
-
-      let projectId: number
-      if (existingId !== null) {
-        projectId = await backend.updateProject(existingId, data)
-        log.ok(`updated project #${projectId}`)
-      } else {
-        projectId = await backend.createProject(data)
-        log.ok(`created project #${projectId}`)
-      }
-
-      await updateEntry(entry.slug, (record) => {
-        record.publishedTo ??= {}
-        record.publishedTo[backend.target] = { id: projectId, at: new Date().toISOString() }
-      })
-
-      if (!skipTech) {
-        const result = await backend.extractTechnologies(projectId)
-        if (result.success) {
-          log.ok(
-            `technologies: ${result.linked} linked${result.created.length > 0 ? `, ${result.created.length} new (${result.created.join(', ')})` : ''}`,
-          )
-        } else {
-          log.warn(`technology extraction failed: ${result.message}`)
-        }
-        for (const issue of result.errors ?? []) {
-          log.warn(issue)
-        }
-      }
-    } catch (error) {
-      log.error(`${entry.slug}: ${error instanceof Error ? error.message : String(error)}`)
-      process.exitCode = 1
-    }
+  try {
+    await runBatch(ready, async (entry) => {
+      log.step(`Publishing ${entry.slug}`)
+      await publishEntry(entry, { backend, skipTech, visibility })
+    })
+  } finally {
+    await backend.close()
   }
 
   log.info('')
-  if (visible) {
+  if (visibility === true) {
     log.detail('Projects are visible. Check them at /admin/collections/projects')
-  } else {
+  } else if (visibility === false) {
     log.detail('Projects were created hidden — untick "hide" in the admin to publish them.')
+  } else {
+    log.detail('New projects were created hidden; existing project visibility was preserved.')
   }
-
-  // The Payload/Postgres pool keeps the event loop alive otherwise.
-  process.exit(process.exitCode ?? 0)
 }

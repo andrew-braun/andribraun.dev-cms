@@ -1,7 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 
-import { flagNumber, flagValue, hasFlag, type ParsedArgs } from '../lib/args'
+import { flagBoolean, flagNumber, flagValue, type ParsedArgs } from '../lib/args'
 import { IngestError, log } from '../lib/log'
 import { createRemoteClient, type RemoteClient, type RemoteDoc } from '../lib/remote'
 
@@ -148,14 +148,14 @@ async function ping(client: RemoteClient): Promise<void> {
 async function list(client: RemoteClient, args: ParsedArgs, rest: string[]): Promise<void> {
   const collection = requireCollection(rest)
   const result = await client.find(collection, {
-    depth: flagNumber(args, 'depth') ?? 0,
-    limit: flagNumber(args, 'limit') ?? 20,
-    page: flagNumber(args, 'page'),
+    depth: flagNumber(args, 'depth', { integer: true, max: 10, min: 0 }) ?? 0,
+    limit: flagNumber(args, 'limit', { integer: true, max: 1000, min: 1 }) ?? 20,
+    page: flagNumber(args, 'page', { integer: true, min: 1 }),
     sort: flagValue(args, 'sort'),
     where: parseWhere(args),
   })
 
-  if (hasFlag(args, 'json')) {
+  if (flagBoolean(args, 'json') ?? false) {
     print(result.docs)
     return
   }
@@ -172,7 +172,7 @@ async function list(client: RemoteClient, args: ParsedArgs, rest: string[]): Pro
 async function get(client: RemoteClient, args: ParsedArgs, rest: string[]): Promise<void> {
   const collection = requireCollection(rest)
   const doc = await client.findByID(collection, requireId(rest), {
-    depth: flagNumber(args, 'depth') ?? 1,
+    depth: flagNumber(args, 'depth', { integer: true, max: 10, min: 0 }) ?? 1,
   })
   print(doc)
 }
@@ -197,7 +197,7 @@ async function remove(client: RemoteClient, args: ParsedArgs, rest: string[]): P
   const id = requireId(rest)
 
   // Deleting from production is not undoable, so make it deliberate.
-  if (!hasFlag(args, 'yes')) {
+  if (!(flagBoolean(args, 'yes') ?? false)) {
     const existing = await client.findByID(collection, id, { depth: 0 })
     log.warn(`About to delete ${collection} #${id} — "${labelOf(existing)}" on ${client.host}`)
     log.info('Re-run with --yes to confirm.')

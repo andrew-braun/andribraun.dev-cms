@@ -21,9 +21,12 @@ export interface CapturedShot extends ShotSpec {
 }
 
 export interface StageState {
+  analysisInput?: string
   analyzedAt?: string
   shotsAt?: string
+  shotsInput?: string
   writeupAt?: string
+  writeupInput?: string
 }
 
 /** Where an entry landed in one specific database. */
@@ -35,24 +38,24 @@ export interface PublishRecord {
 
 export interface ManifestEntry {
   /** Card style on the portfolio front end. Defaults to `visual`. */
-  cardType?: 'text' | 'visual'
+  cardType?: 'text' | 'visual' | null
   /** Marks the project as featured. */
-  featured?: boolean
+  featured?: boolean | null
   /** Full GitHub URL stored on the project. Derived from `repo` when omitted. */
-  githubLink?: string
+  githubLink?: null | string
   /**
    * What `hero_image` should show. Defaults to the home page. A bare path
    * (`/pricing`) is resolved against `liveUrl`. Captured outside the `maxShots`
    * cap, and reuses an existing capture when it points at a route the gallery
    * already covers.
    */
-  hero?: ShotSpec
+  hero?: null | ShotSpec
   /** Deployed site URL. Required for the `shots` stage. */
-  liveUrl?: string
+  liveUrl?: null | string
   /** Maximum screenshots to capture. Defaults to 5. */
-  maxShots?: number
+  maxShots?: null | number
   /** Display order on the portfolio. */
-  order?: number
+  order?: null | number
   /**
    * Publish history keyed by database (`host:port/name`). Project IDs are
    * per-database, so publishing to dev and then to prod creates a separate
@@ -60,17 +63,17 @@ export interface ManifestEntry {
    */
   publishedTo?: Record<string, PublishRecord>
   /** `owner/name` on GitHub. Required for the `analyze` stage. */
-  repo?: string
+  repo?: null | string
   /**
    * Explicit screenshot targets. When set, route auto-discovery is skipped.
    * A bare path (`/about`) is resolved against `liveUrl`.
    */
-  screenshots?: ShotSpec[]
+  screenshots?: null | ShotSpec[]
   /** Skip this entry in every stage. */
   skip?: boolean
   slug: string
   /** Archived / Wayback URL, stored on the project. */
-  snapshotLink?: string
+  snapshotLink?: null | string
   stages: StageState
   title: string
 }

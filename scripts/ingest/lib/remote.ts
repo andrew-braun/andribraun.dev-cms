@@ -12,6 +12,7 @@
  */
 
 import { IngestError } from './log'
+import { type FetchImplementation, fetchRead } from './transport'
 
 export interface RemoteConfig {
   apiKey: string
@@ -42,6 +43,16 @@ export interface RemoteDoc {
   id: number
 }
 
+export class RemoteHTTPError extends IngestError {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+    this.name = 'RemoteHTTPError'
+  }
+}
+
 const DEFAULT_AUTH_COLLECTION = 'third-party-access'
 
 /**
@@ -67,8 +78,21 @@ export function remoteConfig(): RemoteConfig {
 
   let baseUrl: string
   try {
-    baseUrl = new URL(rawUrl).origin
+    const parsed = new URL(rawUrl)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new IngestError('PAYLOAD_REMOTE_URL must use http or https')
+    }
+    if (parsed.username || parsed.password) {
+      throw new IngestError('PAYLOAD_REMOTE_URL must not contain credentials')
+    }
+    baseUrl = parsed.origin
   } catch {
+    if (rawUrl.includes('://')) {
+      const protocol = rawUrl.slice(0, rawUrl.indexOf(':'))
+      if (protocol !== 'http' && protocol !== 'https') {
+        throw new IngestError('PAYLOAD_REMOTE_URL must use http or https')
+      }
+    }
     throw new IngestError(`PAYLOAD_REMOTE_URL is not a valid URL: ${rawUrl}`)
   }
 
@@ -152,14 +176,55 @@ async function describeError(response: Response): Promise<string> {
 export class RemoteClient {
   private readonly apiKey: string
   private readonly authCollection: string
+  private readonly transport: {
+    backoffMs?: number
+    fetchImpl: FetchImplementation
+    timeoutMs: number
+  }
   readonly baseUrl: string
   readonly host: string
 
-  constructor(config: RemoteConfig) {
+  constructor(
+    config: RemoteConfig,
+    options: { backoffMs?: number; fetchImpl?: FetchImplementation; timeoutMs?: number } = {},
+  ) {
     this.baseUrl = config.baseUrl
     this.apiKey = config.apiKey
     this.authCollection = config.authCollection
     this.host = new URL(config.baseUrl).host
+    this.transport = {
+      backoffMs: options.backoffMs,
+      fetchImpl: options.fetchImpl ?? fetch,
+      timeoutMs: options.timeoutMs ?? 20_000,
+    }
+  }
+
+  private async writeRequest(url: string, init: RequestInit): Promise<Response> {
+    const controller = new AbortController()
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort(new Error('timeout'))
+    }, this.transport.timeoutMs)
+    const caller = init.signal
+    const abort = () => controller.abort(caller?.reason)
+    caller?.addEventListener('abort', abort, { once: true })
+    if (caller?.aborted) {
+      abort()
+    }
+    try {
+      return await this.transport.fetchImpl(url, { ...init, signal: controller.signal })
+    } catch (error) {
+      if (timedOut) {
+        throw new IngestError(
+          `${init.method ?? 'POST'} ${url} timed out after ${this.transport.timeoutMs}ms`,
+        )
+      }
+      throw error
+    } finally {
+      clearTimeout(timer)
+      caller?.removeEventListener('abort', abort)
+    }
   }
 
   async create<T = RemoteDoc>(collection: string, data: unknown): Promise<T> {
@@ -221,13 +286,23 @@ export class RemoteClient {
 
     let response: Response
     try {
-      response = await fetch(url, {
+      const requestInit = {
         ...init,
         headers: {
           Authorization: `${this.authCollection} API-Key ${this.apiKey}`,
           ...init.headers,
         },
-      })
+      }
+      if (method === 'GET' || method === 'HEAD') {
+        response = await fetchRead(url, requestInit, {
+          backoffMs: this.transport.backoffMs,
+          fetchImpl: this.transport.fetchImpl,
+          throwHttpErrors: false,
+          timeoutMs: this.transport.timeoutMs,
+        })
+      } else {
+        response = await this.writeRequest(url, requestInit)
+      }
     } catch (error) {
       throw new IngestError(
         `${method} ${url} failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -235,8 +310,9 @@ export class RemoteClient {
     }
 
     if (!response.ok) {
-      throw new IngestError(
+      throw new RemoteHTTPError(
         `${method} /api/${path} → ${response.status} ${await describeError(response)}`,
+        response.status,
       )
     }
 

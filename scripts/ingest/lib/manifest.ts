@@ -1,20 +1,26 @@
 import fs from 'fs/promises'
-import path from 'path'
 
 import type { Manifest, ManifestEntry } from './types'
 
+import { atomicWriteJson } from './artifacts'
 import { IngestError } from './log'
 import { INGEST_DIR, MANIFEST_PATH } from './paths'
+import { validateManifest } from './validation'
 
 const EMPTY: Manifest = { entries: [], updatedAt: new Date(0).toISOString(), version: 1 }
 
 export async function loadManifest(): Promise<Manifest> {
   try {
     const raw = await fs.readFile(MANIFEST_PATH, 'utf8')
-    const parsed = JSON.parse(raw) as Manifest
-    if (!Array.isArray(parsed.entries)) {
-      throw new IngestError('manifest.json is missing an "entries" array')
+    let document: unknown
+    try {
+      document = JSON.parse(raw)
+    } catch (error) {
+      throw new IngestError(
+        `manifest.json is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      )
     }
+    const parsed = validateManifest(document)
     for (const entry of parsed.entries) {
       entry.stages ??= {}
 
@@ -40,7 +46,7 @@ export async function saveManifest(manifest: Manifest): Promise<void> {
   manifest.updatedAt = new Date().toISOString()
   manifest.entries.sort((a, b) => a.slug.localeCompare(b.slug))
   await fs.mkdir(INGEST_DIR, { recursive: true })
-  await fs.writeFile(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  await atomicWriteJson(MANIFEST_PATH, manifest)
 }
 
 /**
@@ -124,6 +130,5 @@ export async function readJson<T>(target: string): Promise<null | T> {
 }
 
 export async function writeJson(target: string, data: unknown): Promise<void> {
-  await fs.mkdir(path.dirname(target), { recursive: true })
-  await fs.writeFile(target, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
+  await atomicWriteJson(target, data)
 }

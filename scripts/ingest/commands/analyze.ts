@@ -4,10 +4,12 @@ import path from 'path'
 import type { EntryContext } from '../lib/types'
 
 import { renderContext } from '../lib/ai'
-import { hasFlag, type ParsedArgs } from '../lib/args'
+import { flagBoolean, type ParsedArgs } from '../lib/args'
+import { atomicWriteFile, reconcileEntryArtifacts, recordStageCompletion } from '../lib/artifacts'
+import { runBatch } from '../lib/batch'
 import { assertGhReady, gatherRepoContext } from '../lib/github'
 import { log } from '../lib/log'
-import { loadManifest, selectEntries, updateEntry, writeJson } from '../lib/manifest'
+import { loadManifest, selectEntries, writeJson } from '../lib/manifest'
 import { readNotes } from '../lib/notes'
 import { contextPath, entryDir, notesPath, rel } from '../lib/paths'
 import { probeSite } from '../lib/site'
@@ -19,16 +21,16 @@ import { probeSite } from '../lib/site'
  */
 export async function analyze(args: ParsedArgs): Promise<void> {
   const manifest = await loadManifest()
-  const entries = selectEntries(manifest, args.positionals)
-  const force = hasFlag(args, 'force')
+  const selected = selectEntries(manifest, args.positionals)
+  const force = flagBoolean(args, 'force') ?? false
 
-  if (entries.length === 0) {
+  if (selected.length === 0) {
     log.warn('No active entries. Run `pnpm ingest discover` or unskip entries in the manifest.')
     return
   }
 
   let needsGh = false
-  for (const entry of entries) {
+  for (const entry of selected) {
     if (entry.repo && (force || !entry.stages.analyzedAt)) {
       needsGh = true
     }
@@ -37,19 +39,19 @@ export async function analyze(args: ParsedArgs): Promise<void> {
     await assertGhReady()
   }
 
-  for (const entry of entries) {
+  await runBatch(selected, async (selectedEntry) => {
+    const notes = await readNotes(selectedEntry.slug)
+    const entry = await reconcileEntryArtifacts(selectedEntry.slug, notes)
     if (!force && entry.stages.analyzedAt) {
       log.detail(`${entry.slug}: already analyzed (--force to redo)`)
-      continue
+      return
     }
 
     log.step(`Analyzing ${entry.slug}`)
 
-    const notes = await readNotes(entry.slug)
-
     if (!entry.repo && !entry.liveUrl && !notes) {
       log.warn(`${entry.slug}: no repo, liveUrl, or notes — nothing to analyze. Skipping.`)
-      continue
+      return
     }
 
     const context: EntryContext = {
@@ -64,16 +66,11 @@ export async function analyze(args: ParsedArgs): Promise<void> {
     }
 
     if (entry.repo) {
-      try {
-        context.repo = await gatherRepoContext(entry.repo)
-        const fileCount = Object.keys(context.repo.files).length
-        log.info(
-          `repo ${context.repo.repo}: ${context.repo.tree.length} paths, ${fileCount} files read`,
-        )
-      } catch (error) {
-        log.error(`${entry.slug}: ${error instanceof Error ? error.message : String(error)}`)
-        continue
-      }
+      context.repo = await gatherRepoContext(entry.repo)
+      const fileCount = Object.keys(context.repo.files).length
+      log.info(
+        `repo ${context.repo.repo}: ${context.repo.tree.length} paths, ${fileCount} files read`,
+      )
     }
 
     if (entry.liveUrl) {
@@ -92,14 +89,12 @@ export async function analyze(args: ParsedArgs): Promise<void> {
     await writeJson(contextPath(entry.slug), context)
 
     const briefingPath = path.join(entryDir(entry.slug), 'context.md')
-    await fs.writeFile(briefingPath, renderContext(context), 'utf8')
+    await atomicWriteFile(briefingPath, renderContext(context))
 
-    await updateEntry(entry.slug, (target) => {
-      target.stages.analyzedAt = context.gatheredAt
-    })
+    await recordStageCompletion(entry.slug, 'analysis', context.gatheredAt, notes)
 
     log.ok(`${entry.slug} → ${rel(briefingPath)}`)
-  }
+  })
 
   log.info('')
   log.detail('Next: pnpm ingest writeup')

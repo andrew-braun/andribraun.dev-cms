@@ -11,11 +11,12 @@ checklist you can follow by hand. Nothing reaches a CMS until you run
 straight to production over the REST API.
 
 ```text
-discover ──▶ analyze ──▶ assess ──▶ writeup ──▶ shots ──▶ ENTER-ME.md ──▶ publish
+discover ──▶ analyze ──▶ assess ──▶ writeup ──▶ shots ──▶ quality ──▶ ENTER-ME.md ──▶ publish
    │            │   ▲       │          │
 manifest    context.md      │      shots/*.png
                     │    writeup.md  shots.json
                     │    case-study.json
+                    │    quality-report.json
              ingest/notes/<slug>.md
              (optional, hand-written)
 ```
@@ -40,6 +41,7 @@ pnpm ingest assess                       # cited repo assessment; explicit unava
 pnpm ingest notes                        # optional; then fill the files in
 pnpm ingest writeup
 pnpm ingest shots
+pnpm ingest quality
 pnpm ingest publish --remote             # straight to production, hidden
 ```
 
@@ -128,13 +130,14 @@ hidden.
 
 Input fingerprints invalidate only dependent generated work:
 
-| Changed input                                  | Invalidated output                          |
-| ---------------------------------------------- | ------------------------------------------- |
-| `liveUrl`                                      | analysis, screenshots, write-up, case study |
-| `repo` or `githubLink`                         | analysis, write-up, case study              |
-| screenshot targets, hero, title, or `maxShots` | screenshots, write-up, case study           |
-| authored notes                                 | write-up and case study                     |
-| snapshot link, ordering, or display metadata   | nothing generated                           |
+| Changed input                                | Invalidated output                          |
+| -------------------------------------------- | ------------------------------------------- |
+| `liveUrl`                                    | analysis, screenshots, write-up, case study |
+| `repo` or `githubLink`                       | analysis, write-up, case study              |
+| screenshot targets, hero, or `maxShots`      | screenshots                                 |
+| `title`                                      | screenshots, write-up, case study           |
+| authored notes                               | write-up and case study                     |
+| snapshot link, ordering, or display metadata | nothing generated                           |
 
 Invalidation deletes stale generated artifacts and clears their stage state;
 it never deletes `manifest.json`, `urls.txt`, or authored notes. Regeneration is
@@ -221,9 +224,10 @@ repository assessment for the case study:
    `outcomes`, `status`, plus a `needsReview` list).
 
 `summary` is the short card blurb, kept free of `<span class="tech">` tags —
-only `description_markdown` feeds technology extraction. When the model omits
-it, the write-up's opening paragraph is used instead (spans stripped), and
-`summary` stays on the `needsReview` list so you give it a second look.
+only `description_markdown` feeds technology extraction. When the model summary
+is missing or outside 20–45 words, a bounded write-up fallback is used when
+available and `summary` stays on the `needsReview` list so you give it a second
+look.
 
 Edit either file freely before publishing; the checklist always points at the
 current files. `--force` regenerates both. Incomplete (`max_tokens`), malformed,
@@ -290,6 +294,14 @@ editing the manifest so the field values on the sheet stay accurate.
 **`status`** — stage matrix for every entry. The `ready` column means the
 `ENTER-ME.md` checklist exists; whether you've actually typed a project into the
 admin panel is something only you know, so the pipeline doesn't guess.
+
+**`quality`** — writes the current advisory review snapshot to
+`ingest/quality-report.json`. Warnings are advisory: they never block a stage,
+`status`, or `publish`. The report is overwritten on each run and can flag
+`case-study-needs-review`, `unverified-authorship`, `summary-length`,
+`generic-screenshot-alt`, `screenshot-capture-issue`, and `missing-artifact`.
+Run it after `shots`, and use the per-project messages and remediation notes to
+decide what needs a manual edit or recapture.
 
 ## Manual entry, step by step
 

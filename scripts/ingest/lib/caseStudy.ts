@@ -91,6 +91,11 @@ function stripTechSpans(value: string): string {
     .trim()
 }
 
+export function isSummaryWithinWordRange(value: string): boolean {
+  const words = value.trim().split(/\s+/).filter(Boolean)
+  return words.length >= 20 && words.length <= 45
+}
+
 /**
  * Falls back to the write-up's opening paragraph when the model omits
  * `summary`. The write-up instructions already open with a 2–3 sentence
@@ -109,15 +114,10 @@ export function summaryFromWriteup(markdown: string): string | undefined {
   }
 
   const plain = stripTechSpans(paragraph)
-  if (plain === '') {
+  if (!isSummaryWithinWordRange(plain)) {
     return undefined
   }
-  if (plain.length <= 800) {
-    return plain
-  }
-  const clipped = plain.slice(0, 797)
-  const boundary = clipped.lastIndexOf(' ')
-  return `${clipped.slice(0, boundary > 0 ? boundary : undefined).trimEnd()}...`
+  return plain
 }
 
 /**
@@ -129,8 +129,21 @@ export function preferWriteupSummary(
   caseStudy: CaseStudySidecar,
   markdown: string,
 ): CaseStudySidecar {
-  const summary = summaryFromWriteup(markdown)
-  return summary ? { ...caseStudy, summary } : caseStudy
+  if (caseStudy.summary && isSummaryWithinWordRange(caseStudy.summary)) {
+    return caseStudy
+  }
+
+  const fallback = summaryFromWriteup(markdown)
+  const needsReview = [...new Set(['summary', ...caseStudy.needsReview])]
+  if (!fallback) {
+    return { ...caseStudy, needsReview }
+  }
+
+  return {
+    ...caseStudy,
+    needsReview,
+    summary: fallback.split(/\s+/).filter(Boolean).slice(0, 45).join(' '),
+  }
 }
 
 function isStatus(value: unknown): value is ProjectStatus {

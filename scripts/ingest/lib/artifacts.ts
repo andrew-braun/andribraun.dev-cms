@@ -180,7 +180,6 @@ export function fingerprintsFor(
     writeup: digest({
       analysisInput: entry.stages.analysisInput,
       notes: notes ?? null,
-      shotsInput: entry.stages.shotsInput,
       title: entry.title,
     }),
   }
@@ -196,7 +195,7 @@ export function invalidateDerivedArtifacts(
     return ['caseStudy']
   }
   if (stage === 'shots') {
-    return ['writeup', 'caseStudy']
+    return []
   }
   return []
 }

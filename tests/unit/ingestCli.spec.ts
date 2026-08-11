@@ -6,6 +6,10 @@ vi.mock('../../scripts/ingest/commands/status', () => ({
   status: vi.fn(() => Promise.reject(new Error('fixture failure'))),
 }))
 
+vi.mock('../../scripts/ingest/commands/quality', () => ({
+  quality: vi.fn(() => Promise.resolve()),
+}))
+
 describe('ingest CLI', () => {
   it('returns one for an unknown command', async () => {
     const { run } = await import('../../scripts/ingest/cli')
@@ -15,6 +19,11 @@ describe('ingest CLI', () => {
   it('returns one when a command throws', async () => {
     const { run } = await import('../../scripts/ingest/cli')
     await expect(run(['status'])).resolves.toBe(1)
+  })
+
+  it('runs the advisory quality command', async () => {
+    const { run } = await import('../../scripts/ingest/cli')
+    await expect(run(['quality'])).resolves.toBe(0)
   })
 
   it('runs through the Payload wrapper and exits nonzero on failure', async () => {

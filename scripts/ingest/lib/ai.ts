@@ -304,43 +304,46 @@ export async function generateAltText(
   projectTitle: string,
   label: string,
 ): Promise<string> {
-  const data = await fs.readFile(imagePath)
+  try {
+    const data = await fs.readFile(imagePath)
 
-  const response = await sendMessage(
-    [
-      {
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', data: data.toString('base64'), media_type: 'image/png' },
-          },
-          {
-            type: 'text',
-            text: `Write alt text for this screenshot of the "${projectTitle}" project (screen: ${label}).
+    const response = await sendMessage(
+      [
+        {
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', data: data.toString('base64'), media_type: 'image/png' },
+            },
+            {
+              type: 'text',
+              text: `Write alt text for this screenshot of the "${projectTitle}" project (screen: ${label}).
 
 Requirements:
 - One sentence, 15-35 words, no trailing period issues, plain prose.
 - Describe the specific interface shown: the page or screen, its main visual elements, and the notable controls or content visible.
 - Start with the project or screen name where it reads naturally, e.g. "WhereNext.ai homepage hero section with...".
 - Do not begin with "Screenshot of" or "Image of". Do not mention that it is a screenshot.`,
-          },
-        ],
-        role: 'user',
+            },
+          ],
+          role: 'user',
+        },
+      ],
+      {
+        effort: 'low',
+        maxTokens: 1000,
+        model: MODEL,
+        outputSchema: altTextSchema,
       },
-    ],
-    {
-      effort: 'low',
-      maxTokens: 1000,
-      model: MODEL,
-      outputSchema: altTextSchema,
-    },
-  )
+    )
 
-  const result = parseJsonFromResponse<{ alt: string }>(response, { alt: '' })
-  const alt = result.alt?.trim()
-  if (!alt) {
+    const result = parseJsonFromResponse<{ alt: string }>(response, { alt: '' })
+    const alt = result.alt?.trim()
+    if (alt) {
+      return alt
+    }
+  } catch {
     // Never block a capture on alt text; the placeholder is obvious in review.
-    return `${projectTitle} — ${label}`
   }
-  return alt
+  return `${projectTitle} — ${label}`
 }

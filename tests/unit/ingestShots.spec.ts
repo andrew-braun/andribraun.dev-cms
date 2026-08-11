@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import type { CapturedShot } from '../../scripts/ingest/lib/types'
 
 import { replaceArtifactSet } from '../../scripts/ingest/lib/artifacts'
+import { detectScreenshotCaptureIssues } from '../../scripts/ingest/lib/screenshotQuality'
 import { validateCapturedShots } from '../../scripts/ingest/lib/validation'
 
 async function readJson(target: string): Promise<unknown> {
@@ -31,6 +32,15 @@ async function screenshotFixture(shots: Array<Pick<CapturedShot, 'alt' | 'file'>
 }
 
 describe('transactional screenshots', () => {
+  it('flags consent and page-error overlays from visible page text', () => {
+    expect(
+      detectScreenshotCaptureIssues(
+        'We use cookies. Accept All. This page can’t load Google Maps correctly.',
+      ),
+    ).toEqual(['cookie-consent', 'page-error'])
+    expect(detectScreenshotCaptureIssues('Meet the team and explore our services.')).toEqual([])
+  })
+
   it('preserves the previous screenshot set when capture fails', async () => {
     const fixture = await screenshotFixture([{ alt: 'old', file: 'old.png' }])
     await expect(
@@ -101,5 +111,33 @@ describe('transactional screenshots', () => {
     ).rejects.toThrow('manifest commit failed')
     await expect(fs.readFile(path.join(fixture.shotsDir, 'old.png'), 'utf8')).resolves.toBe('old')
     await expect(readJson(fixture.manifest)).resolves.toEqual([{ alt: 'old', file: 'old.png' }])
+  })
+
+  it('accepts capture issue metadata with an otherwise valid screenshot artifact', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ingest-shots-validation-'))
+    const file = 'home.png'
+    const png = Buffer.alloc(24)
+    Buffer.from('89504e470d0a1a0a', 'hex').copy(png)
+    png.writeUInt32BE(1, 16)
+    png.writeUInt32BE(1, 20)
+    await fs.writeFile(path.join(root, file), png)
+
+    await expect(
+      validateCapturedShots(
+        [
+          {
+            alt: 'Alpha homepage.',
+            captureIssues: ['cookie-consent'],
+            file,
+            height: 1,
+            hero: true,
+            label: 'Home',
+            url: 'https://alpha.test/',
+            width: 1,
+          },
+        ],
+        root,
+      ),
+    ).resolves.toBeUndefined()
   })
 })

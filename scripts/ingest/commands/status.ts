@@ -2,11 +2,12 @@ import fs from 'fs/promises'
 import path from 'path'
 
 import type { ParsedArgs } from '../lib/args'
+import type { QualityReport } from '../lib/quality'
 import type { ManifestEntry } from '../lib/types'
 
 import { log } from '../lib/log'
-import { loadManifest } from '../lib/manifest'
-import { entryDir, MANIFEST_PATH, rel } from '../lib/paths'
+import { loadManifest, readJson } from '../lib/manifest'
+import { entryDir, MANIFEST_PATH, QUALITY_REPORT_PATH, rel } from '../lib/paths'
 
 const STAGES = ['analyze', 'assess', 'writeup', 'case', 'shots', 'ready'] as const
 
@@ -18,6 +19,10 @@ export function isEntryReady(entry: ManifestEntry, hasSheet: boolean): boolean {
     entry.stages.writeupAt &&
     entry.stages.caseStudyAt,
   )
+}
+
+export function formatQualityReportStatus(report: QualityReport): string {
+  return `Quality report: ${rel(QUALITY_REPORT_PATH)} (${report.summary.warnings} warnings)`
 }
 
 /**
@@ -75,6 +80,15 @@ export async function status(args: ParsedArgs): Promise<void> {
   log.info(`${ready}/${active} active entries ready for manual entry.`)
   if (ready > 0) {
     log.detail('Open ingest/work/<slug>/ENTER-ME.md and follow it in /admin')
+  }
+
+  try {
+    const report = await readJson<QualityReport>(QUALITY_REPORT_PATH)
+    if (report) {
+      log.info(formatQualityReportStatus(report))
+    }
+  } catch {
+    log.warn(`Could not read ${rel(QUALITY_REPORT_PATH)}; run pnpm ingest quality to refresh it.`)
   }
 }
 

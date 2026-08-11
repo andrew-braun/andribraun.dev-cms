@@ -1,8 +1,15 @@
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { EntryContext } from '../../scripts/ingest/lib/types'
 
-import { generateCaseStudy, renderAssessmentContext } from '../../scripts/ingest/lib/ai'
+import {
+  generateAltText,
+  generateCaseStudy,
+  renderAssessmentContext,
+} from '../../scripts/ingest/lib/ai'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -93,5 +100,19 @@ describe('case-study generation request', () => {
 
     expect(requestBody).toMatchObject({ max_tokens: 2500, model: 'claude-sonnet-4-5' })
     expect(requestBody?.output_config).not.toHaveProperty('effort')
+  })
+})
+
+describe('screenshot alt text', () => {
+  it('falls back to a visible placeholder when the vision request fails', async () => {
+    process.env.CLAUDE_API_KEY = 'test-key'
+    const image = path.join(await fs.mkdtemp(path.join(os.tmpdir(), 'ingest-alt-')), 'screen.png')
+    await fs.writeFile(image, 'image')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('network unavailable'))),
+    )
+
+    await expect(generateAltText(image, 'Alpha', 'Home')).resolves.toBe('Alpha — Home')
   })
 })

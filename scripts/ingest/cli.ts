@@ -14,6 +14,7 @@ import { assess } from './commands/assess'
 import { discover } from './commands/discover'
 import { notes } from './commands/notes'
 import { publish } from './commands/publish'
+import { quality } from './commands/quality'
 import { remote } from './commands/remote'
 import { sheet } from './commands/sheet'
 import { shots } from './commands/shots'
@@ -28,6 +29,7 @@ const COMMANDS: Record<string, (args: ParsedArgs) => Promise<void>> = {
   discover,
   notes,
   publish,
+  quality,
   remote,
   sheet,
   shots,
@@ -49,6 +51,7 @@ const KNOWN_FLAGS: Record<string, string[]> = {
   discover: ['all', 'archived', 'forks', 'limit', 'no-github', 'owner', 'urls'],
   notes: [],
   publish: ['dry-run', 'no-tech', 'remote', 'visible'],
+  quality: [],
   remote: ['alt', 'collection', 'data', 'depth', 'json', 'limit', 'page', 'sort', 'where', 'yes'],
   sheet: [],
   shots: ['force', 'max', 'no-alt'],
@@ -87,6 +90,7 @@ Commands
   writeup    Generate description_markdown + case-study.json with Claude
              → work/<slug>/writeup.md, case-study.json
   shots      Capture 2560x1440 screenshots + alt text     → work/<slug>/shots/
+  quality    Write advisory data-quality warnings          → ingest/quality-report.json
   sheet      Rebuild the manual-entry checklist           → work/<slug>/ENTER-ME.md
   status     Show the stage matrix for every entry
 
@@ -130,6 +134,7 @@ Typical run
   pnpm ingest assess
   pnpm ingest notes                     # then fill in ingest/notes/<slug>.md
   pnpm ingest writeup && pnpm ingest shots
+  pnpm ingest quality
 
 Notes are optional but matter most for sites with no repo, where the probe sees
 only rendered HTML. They are read fresh by writeup, so editing them needs no

@@ -14,6 +14,7 @@ import { IngestError, log } from '../lib/log'
 import { loadManifest, readJson, safeFilename, selectEntries } from '../lib/manifest'
 import { readNotes } from '../lib/notes'
 import { contextPath, rel, resolveContained, shotsDir, shotsManifestPath } from '../lib/paths'
+import { detectScreenshotCaptureIssues } from '../lib/screenshotQuality'
 import { writeSheet } from '../lib/sheet'
 import { assertPublicHttpUrl } from '../lib/transport'
 
@@ -32,10 +33,12 @@ const DISMISS_SELECTORS = [
   '[class*="cookie" i] button:has-text("Accept")',
   'button:has-text("Accept all")',
   'button:has-text("Accept All")',
+  'button:has-text("Allow all")',
   'button:has-text("Accept cookies")',
   'button:has-text("I agree")',
   'button:has-text("Got it")',
   '#onetrust-accept-btn-handler',
+  '[role="dialog"] button:has-text("Accept")',
   '[aria-label="Close" i]',
 ]
 
@@ -122,6 +125,9 @@ export async function shots(args: ParsedArgs): Promise<void> {
           try {
             for (const target of targets) {
               await settle(page, target.url)
+              const captureIssues = detectScreenshotCaptureIssues(
+                await page.locator('body').innerText(),
+              )
 
               const file = `${safeFilename(`${entry.title} - ${target.label}`)}.png`
               const filePath = resolveContained(staging.dir, file)
@@ -134,12 +140,16 @@ export async function shots(args: ParsedArgs): Promise<void> {
 
               captured.push({
                 alt,
+                ...(captureIssues.length > 0 ? { captureIssues } : {}),
                 file,
                 height: VIEWPORT.height * SCALE,
                 label: target.label,
                 url: target.url,
                 width: VIEWPORT.width * SCALE,
               })
+              if (captureIssues.length > 0) {
+                log.warn(`${file}: ${captureIssues.join(', ')}`)
+              }
               log.ok(`${file}`)
               log.detail(alt)
             }

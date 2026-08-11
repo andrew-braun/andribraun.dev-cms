@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ManifestEntry } from '../../scripts/ingest/lib/types'
 
-import { isEntryReady } from '../../scripts/ingest/commands/status'
+import { formatQualityReportStatus, isEntryReady } from '../../scripts/ingest/commands/status'
 
 function entry(stages: ManifestEntry['stages'], skip = false): ManifestEntry {
   return { slug: 'alpha', skip, stages, title: 'Alpha' }
@@ -37,5 +37,11 @@ describe('ingest status readiness', () => {
         true,
       ),
     ).toBe(false)
+  })
+
+  it('renders the advisory warning count without changing readiness', () => {
+    expect(formatQualityReportStatus({ summary: { warnings: 3 } } as never)).toBe(
+      'Quality report: ingest/quality-report.json (3 warnings)',
+    )
   })
 })

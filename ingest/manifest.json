@@ -22,15 +22,15 @@
       "stages": {
         "analysisArtifact": "a065d6cf71f127cdaf342f3f4e84c26601ee30583de49bd97776335c12c31be6",
         "analysisInput": "2e8cfc2a75b77bd125fe638664ac1337de4b0fd75b159e39bda70cd38608b615",
-        "analyzedAt": "2026-08-09T09:59:02.870Z",
-        "assessedAt": "2026-08-09T10:00:03.317Z",
+        "analyzedAt": "2026-08-11T15:50:52.443Z",
+        "assessedAt": "2026-08-11T15:54:17.014Z",
         "assessmentInput": "e805ccf5702e3ec68b927cdb65c0a0a43f75544f2a49969b3256a164f33315bb",
-        "caseStudyAt": "2026-08-09T15:52:56.060Z",
-        "caseStudyInput": "67cdcbba329d9c9ea68e463a613b74e420df599ae02426bf79e0a78f57cd5d5a",
-        "shotsAt": "2026-08-09T10:13:23.209Z",
+        "caseStudyAt": "2026-08-11T15:55:23.862Z",
+        "caseStudyInput": "d4fa1a7915a0d02f78985ea51e3c1a413cba28e236efb832b7f2388cb84e869e",
+        "shotsAt": "2026-08-11T15:59:29.498Z",
         "shotsInput": "7c6f6e1cb3005d194dcedc68c718b9a98001acf8208830938a087da00ff8ffeb",
-        "writeupAt": "2026-08-09T15:52:56.046Z",
-        "writeupInput": "bb6ed273da19d80903b677dc99e9385016f7b7ae510a5932d024bd35b897a32a"
+        "writeupAt": "2026-08-11T15:55:23.850Z",
+        "writeupInput": "b51ea06b537049e555cd63370cc40a09af786212d7a647c045eef265d7696ef7"
       },
       "title": "All Points Advising"
     },
@@ -73,13 +73,13 @@
       "stages": {
         "analysisArtifact": "1aa71c3b79c87c448f166fd2786f7b4d8d5cbf29ec664260d40282d8ee317047",
         "analysisInput": "3a6017bd65f721008b289adce6f907bf98fdac32aaef8c4f52446f17365bb756",
-        "analyzedAt": "2026-08-09T09:59:06.647Z",
-        "assessedAt": "2026-08-09T12:49:11.853Z",
+        "analyzedAt": "2026-08-11T15:50:52.987Z",
+        "assessedAt": "2026-08-11T15:55:00.399Z",
         "assessmentInput": "d8bd00b40fcc4d45827ad0d9c4254cafcd6634c214590c9e89874f64174fb0e9",
-        "caseStudyAt": "2026-08-09T15:46:26.973Z",
-        "caseStudyInput": "40006adb1abf7c6778cfc7c405f6ad089d1feab026fb79caf91f6761f4ccb776",
-        "writeupAt": "2026-08-09T15:46:26.941Z",
-        "writeupInput": "de4a501408a9c4957b1fe37f16257be048575c484f1b28767f3807c36be1719a"
+        "caseStudyAt": "2026-08-11T15:56:24.700Z",
+        "caseStudyInput": "5a019922a5ebcee7be2b816b9434f74aa4af0c3ba9d4f373571e7fccc5f4e329",
+        "writeupAt": "2026-08-11T15:56:24.693Z",
+        "writeupInput": "1ab1323bc778e47c4cefdf52d69448f95243dda22d32b673608f927109fe8334"
       },
       "title": "Portfolio CMS"
     },
@@ -150,15 +150,15 @@
       "stages": {
         "analysisArtifact": "f3020501bfb117460eb446e1c6745a6fcab2e6d04a07034c342a23c686546f90",
         "analysisInput": "31e25542d814ab1c4588335d65e483dc9d8186c871a21c6f6a6b28b7443575b9",
-        "analyzedAt": "2026-08-09T09:59:09.284Z",
-        "assessedAt": "2026-08-09T10:00:03.323Z",
+        "analyzedAt": "2026-08-11T15:50:55.761Z",
+        "assessedAt": "2026-08-11T15:55:00.434Z",
         "assessmentInput": "5f1fbc6b97f0d33f72e07279a9c8a15a5aeb6512dac8253a87363479541b558d",
-        "caseStudyAt": "2026-08-09T12:53:46.358Z",
-        "caseStudyInput": "d96141390aad7fecce4ee1a9f8e712b323887bc0e99f07734b23a1b5454d4e09",
-        "shotsAt": "2026-08-09T10:14:34.977Z",
+        "caseStudyAt": "2026-08-11T15:56:56.684Z",
+        "caseStudyInput": "067df91b1974509ec6bced7a444dc5d37997e7cd3feb771e96aa23fe7c275834",
+        "shotsAt": "2026-08-11T16:01:21.112Z",
         "shotsInput": "c0a197dfe5f6e07921628ee9964012e614b01d2eb618cfdac7e50cebe7eacc01",
-        "writeupAt": "2026-08-09T12:53:46.354Z",
-        "writeupInput": "9c2c068fa4638970d37f5af87f7db159cbe1c8fcf4313fe988c951de52b98218"
+        "writeupAt": "2026-08-11T15:56:56.681Z",
+        "writeupInput": "f4e10e84b43e5aa3305bb164f69cd2534d3ed35e2afaea2e576f45bb49f2845d"
       },
       "title": "Entity Inc"
     },
@@ -174,15 +174,15 @@
       "stages": {
         "analysisArtifact": "bdfd6cac74b1604f23e59aaee1d2a3f7e7c2cd9085fea2349c1449f61eece0f9",
         "analysisInput": "fb18d7bbdb1691300e6b1a4f41a84cd0d553a3383ae4b5f86827bb884b3af7c0",
-        "analyzedAt": "2026-08-09T09:59:09.672Z",
-        "assessedAt": "2026-08-09T10:00:03.330Z",
+        "analyzedAt": "2026-08-11T15:50:56.101Z",
+        "assessedAt": "2026-08-11T15:55:00.465Z",
         "assessmentInput": "f542d9fc55264ca89f8edbe696deaffb95ea3bf9c4c1f65260bae1efcb44eb71",
-        "caseStudyAt": "2026-08-09T15:53:24.783Z",
-        "caseStudyInput": "78a99cf941585d676923246ddd219a3dc4a09ccfea80d14c5fd47af78351f361",
-        "shotsAt": "2026-08-09T10:15:04.817Z",
+        "caseStudyAt": "2026-08-11T15:57:24.364Z",
+        "caseStudyInput": "4049d9c2c6f0d2a2d481005c8185e3689a47964bbc0ad8db9ec6c6b6e8628913",
+        "shotsAt": "2026-08-11T16:02:06.177Z",
         "shotsInput": "d78eae057ad45268fbdb66f65016647aab60fe6024a94061c3e23dd98dd423de",
-        "writeupAt": "2026-08-09T15:53:24.769Z",
-        "writeupInput": "8bd23d60efdf333149c498a2818925c58f7a0ed927fb75e5412081365c9e69db"
+        "writeupAt": "2026-08-11T15:57:24.360Z",
+        "writeupInput": "5632191420ef0c7cd05e810a0a397a8252582fc8163fc0b7fe39bc87ff8238fd"
       },
       "title": "Expat Financial Solutions"
     },
@@ -233,15 +233,15 @@
       "stages": {
         "analysisArtifact": "92feee5e69652959433fa29da6cb2dd8a1510dfa5d9d290a1de572f72b8d270b",
         "analysisInput": "5781fc09ecb9807598b876402f352cb21727a01390253c879f151fb3089fe3d5",
-        "analyzedAt": "2026-08-09T09:59:10.511Z",
-        "assessedAt": "2026-08-09T12:48:18.280Z",
+        "analyzedAt": "2026-08-11T15:50:56.678Z",
+        "assessedAt": "2026-08-11T15:55:33.143Z",
         "assessmentInput": "e24b2a7a9e1cb539b0e9701bd02f162bf72369f1e7d9601d7e2a0b1ec962d643",
-        "caseStudyAt": "2026-08-09T12:55:14.478Z",
-        "caseStudyInput": "8f6ed3daee7114c5193a31df03c36e87c8947bc3050d121aaa0016b803a4966e",
-        "shotsAt": "2026-08-09T10:15:23.697Z",
+        "caseStudyAt": "2026-08-11T15:58:15.150Z",
+        "caseStudyInput": "d547c80937b5f31bce81ba82dede9ea1c3842384082d421cced448559231d147",
+        "shotsAt": "2026-08-11T16:02:36.392Z",
         "shotsInput": "70d1e4001d42f265f504713048f74734e0e32329ade87ce79858c42b768445a9",
-        "writeupAt": "2026-08-09T12:55:14.474Z",
-        "writeupInput": "0d2854c0be1bb1d08cdefea150c569c06c9329e4d8d3fcfd48e8aaed62b8c175"
+        "writeupAt": "2026-08-11T15:58:15.143Z",
+        "writeupInput": "29ddb4ac9a942bb57c6787d74fef10942627cf847f876f912fde6c89a367e8a3"
       },
       "title": "GeoBeerMap"
     },
@@ -288,17 +288,17 @@
       ],
       "skip": false,
       "stages": {
-        "analysisArtifact": "f7e0bd4181650a240501d8af84642be0f0328a6c44efb224e64ac4cf58debd2d",
+        "analysisArtifact": "4fda3e959199042bfb6ce9d8102b651923fc020c7cf7f2001162eb8c2c3fb2f3",
         "analysisInput": "abf9e1196467207b2d6bc5c0378de3c7c84a348c749af0f509834648d34b362d",
-        "analyzedAt": "2026-08-09T09:59:16.864Z",
-        "assessedAt": "2026-08-09T12:49:55.245Z",
-        "assessmentInput": "d53b17e1d011b33ea9f55f4cb1180c1283af0d59b9a58c52ad9c013edaf1ae94",
-        "caseStudyAt": "2026-08-09T12:56:03.261Z",
-        "caseStudyInput": "abb6504f68688501161faeb3ec2d5bd9f6562b8ea0587cd8e9f20f02668888e2",
-        "shotsAt": "2026-08-09T10:15:38.732Z",
+        "analyzedAt": "2026-08-11T15:51:02.480Z",
+        "assessedAt": "2026-08-11T16:01:50.850Z",
+        "assessmentInput": "859402b1dc8b472ef3146ce86bbd7c568c494b993cafe7be82d50979b94b110e",
+        "caseStudyAt": "2026-08-11T16:02:55.616Z",
+        "caseStudyInput": "7d1053bf41f27d99d09f74505938891db0556c34ad37094adfa58fab9ba10291",
+        "shotsAt": "2026-08-11T16:03:15.349Z",
         "shotsInput": "7e8bec5f84887246b7a0e27f70da957ef27188d8220dd76ce3319d1301ed74e6",
-        "writeupAt": "2026-08-09T12:56:03.258Z",
-        "writeupInput": "80e7143c6d95cd216a7eb7d215e6489e7ef8f9ec394b058710d8a895beb54e3e"
+        "writeupAt": "2026-08-11T16:02:55.606Z",
+        "writeupInput": "c2a9bad60257618891bdd666ef56a97b8c6413d4245b928384e95b376828db3d"
       },
       "title": "Glyphin"
     },
@@ -379,15 +379,15 @@
       "stages": {
         "analysisArtifact": "16aa8aa1df2530b50489fcd819fed69d6fa8d0dbae1df66268eb7153ababa4fd",
         "analysisInput": "82a97bfab8828ff7582f715ec829ba6742c433e18070eea059d92c9a16b8f7db",
-        "analyzedAt": "2026-08-09T09:59:20.916Z",
-        "assessedAt": "2026-08-09T12:50:33.594Z",
+        "analyzedAt": "2026-08-11T15:51:07.514Z",
+        "assessedAt": "2026-08-11T15:56:55.989Z",
         "assessmentInput": "1dce0b6feabd264760f628a5bfa6117f053a362925464513fa142be894a73eb0",
-        "caseStudyAt": "2026-08-09T12:56:52.076Z",
-        "caseStudyInput": "e6d33f4bae1b2dd14a4779a4f058640fa8fcd4f44fb22ff139f600c620bec24f",
-        "shotsAt": "2026-08-09T10:16:17.920Z",
+        "caseStudyAt": "2026-08-11T15:59:04.461Z",
+        "caseStudyInput": "74154278b3ae3940ead2bc829bd863a640aa8b02be66eb83d1890193d3adbacc",
+        "shotsAt": "2026-08-11T16:04:24.599Z",
         "shotsInput": "b4e1f0e12921aa7d34fa6b1610e5c3deed89fc513f24894dde78dffc221fda24",
-        "writeupAt": "2026-08-09T12:56:52.074Z",
-        "writeupInput": "a658e514fa62b3d1e3e4c83f660630ce06f0a1e22f1713e5fdb3ed04d01c0cf3"
+        "writeupAt": "2026-08-11T15:59:04.452Z",
+        "writeupInput": "aea0581e0dabd1386610cee96e5ec8fe6f72ab046277b3414d77c44bcf3cb590"
       },
       "title": "Online Taxman"
     },
@@ -511,15 +511,15 @@
       "stages": {
         "analysisArtifact": "eea4c34788bfdb7920e521e7a2626c605dd3f9c35cfe9e1e876db52094dbd56d",
         "analysisInput": "84ab54ca24595ae1f27d92a9de5f2e442e5cf85c45de4a9985e6ea1ec3150d83",
-        "analyzedAt": "2026-08-09T09:59:25.074Z",
-        "assessedAt": "2026-08-09T12:51:05.915Z",
+        "analyzedAt": "2026-08-11T15:51:13.134Z",
+        "assessedAt": "2026-08-11T15:57:34.775Z",
         "assessmentInput": "786af3d9c6a3f2663509048715db363d5bcd5aad85102e0fc868032cd90662ff",
-        "caseStudyAt": "2026-08-09T12:57:37.051Z",
-        "caseStudyInput": "19cdaa918170dd64451fdce709459921942eb3e54193c4dca7ba239909568dfc",
-        "shotsAt": "2026-08-09T10:16:25.391Z",
+        "caseStudyAt": "2026-08-11T16:03:49.235Z",
+        "caseStudyInput": "d2f7a19fc5849e1d62deb84eef9c20d2e10b5d66aab52ad9457deb15b6ae304e",
+        "shotsAt": "2026-08-11T16:04:45.419Z",
         "shotsInput": "4fafb95bc55a5e6b3c844abd46e7aa272844fe674df4d2d479c8a34a2a2f3d46",
-        "writeupAt": "2026-08-09T12:57:37.048Z",
-        "writeupInput": "ce447407370b89ca9cd05894ec13047251f79ad3a7731f44b9139c1935645af9"
+        "writeupAt": "2026-08-11T16:03:49.230Z",
+        "writeupInput": "a9d791203f4c0a7298617f680faf269e38afaafee26bb628b2170fb8d3209970"
       },
       "title": "TalkSpark"
     },
@@ -578,19 +578,19 @@
       "stages": {
         "analysisArtifact": "a9bbd201005540f2fdbf087ab9b84a2ab1cf3900b7215b54c85998f777570637",
         "analysisInput": "91871e90cc21d08b1d0acd165a04aed7bd3127353bbe11af514d7fd7614dd575",
-        "analyzedAt": "2026-08-09T09:59:30.252Z",
-        "assessedAt": "2026-08-09T10:00:03.337Z",
+        "analyzedAt": "2026-08-11T15:51:20.319Z",
+        "assessedAt": "2026-08-11T15:57:34.791Z",
         "assessmentInput": "1cc9704c65084b6c049cd0fc8b8c8b41baf489fc1f75f7896b27bca9548dbee8",
-        "caseStudyAt": "2026-08-09T12:58:13.201Z",
-        "caseStudyInput": "994465fc50ab73f5638b8f7304b1ed8ac663394f78bc00d0fef2a66fbe9ec1b8",
-        "shotsAt": "2026-08-09T10:16:42.860Z",
+        "caseStudyAt": "2026-08-11T16:04:08.951Z",
+        "caseStudyInput": "2dd2d883dfa4f8fca3dd91d9bfef2dd7668f051e93964c74a163155bb6cce157",
+        "shotsAt": "2026-08-11T16:06:06.242Z",
         "shotsInput": "08f249e2c9d73791f61704e33d8df28f9f4f5e0ec9c20fa6fb8fc1bece38e614",
-        "writeupAt": "2026-08-09T12:58:13.198Z",
-        "writeupInput": "a2c04e614923be60719f892b57950f2385ab6fb4fc684857dce7f3f7975c43a6"
+        "writeupAt": "2026-08-11T16:04:08.938Z",
+        "writeupInput": "7389ee2204a87745be9da3daf9784d281b1c90a7349a6868c3524b5029416ca1"
       },
       "title": "YourMove.ge"
     }
   ],
-  "updatedAt": "2026-08-10T15:57:20.126Z",
+  "updatedAt": "2026-08-11T16:06:06.244Z",
   "version": 1
 }

@@ -22,4 +22,11 @@ describe('ingest operator contract', () => {
     expect(docs).toContain('`max_tokens`')
     expect(docs).not.toContain('a stub sidecar')
   })
+
+  it('documents the advisory quality-report review step', async () => {
+    const docs = await fs.readFile('docs/ingest.md', 'utf8')
+    expect(docs).toContain('pnpm ingest quality')
+    expect(docs).toContain('ingest/quality-report.json')
+    expect(docs).toContain('Warnings are advisory')
+  })
 })

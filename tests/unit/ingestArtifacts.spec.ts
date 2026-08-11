@@ -135,10 +135,10 @@ describe('atomic artifacts', () => {
 })
 
 describe('dependency invalidation', () => {
-  it('a completed analysis or screenshot run invalidates derived prose', () => {
+  it('invalidates prose only when its source stage changes', () => {
     expect(invalidateDerivedArtifacts('analysis')).toEqual(['assessment', 'writeup', 'caseStudy'])
     expect(invalidateDerivedArtifacts('assessment')).toEqual(['caseStudy'])
-    expect(invalidateDerivedArtifacts('shots')).toEqual(['writeup', 'caseStudy'])
+    expect(invalidateDerivedArtifacts('shots')).toEqual([])
     expect(invalidateDerivedArtifacts('writeup')).toEqual(['caseStudy'])
   })
 
@@ -153,11 +153,7 @@ describe('dependency invalidation', () => {
       { githubLink: 'https://github.com/example/new' },
       ['analysis', 'assessment', 'writeup', 'caseStudy'],
     ],
-    [
-      'screenshots',
-      { screenshots: [{ label: 'About', url: '/about' }] },
-      ['shots', 'writeup', 'caseStudy'],
-    ],
+    ['screenshots', { screenshots: [{ label: 'About', url: '/about' }] }, ['shots']],
     ['snapshotLink', { snapshotLink: 'https://archive.example/' }, []],
     ['order', { order: 4 }, []],
   ] as const)('changing %s invalidates %j', async (_field, change, expected) => {
@@ -205,6 +201,22 @@ describe('dependency invalidation', () => {
     await expect(exists(path.join(state.entryDir, 'writeup.md'))).resolves.toBe(true)
     expect(completed.stages.caseStudyAt).toBeUndefined()
     await expect(exists(path.join(state.entryDir, 'case-study.json'))).resolves.toBe(false)
+  })
+
+  it('recording screenshots preserves completed prose artifacts', async () => {
+    const state = await fixture()
+    const completed = await recordStageCompletion(
+      'alpha',
+      'shots',
+      '2026-08-09T01:02:03.000Z',
+      state.notes,
+      { manifestPath: state.manifestPath, workDir: state.workDir },
+    )
+
+    expect(completed.stages.writeupAt).toBeDefined()
+    expect(completed.stages.caseStudyAt).toBeDefined()
+    await expect(exists(path.join(state.entryDir, 'writeup.md'))).resolves.toBe(true)
+    await expect(exists(path.join(state.entryDir, 'case-study.json'))).resolves.toBe(true)
   })
 
   it('invalidates a stored assessment whose evidence path is not in analyzed files', async () => {

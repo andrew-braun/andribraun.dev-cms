@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "generatedAt": "2026-08-11T16:07:12.350Z",
+  "summary": {
+    "entries": 9,
+    "warnings": 20,
+    "byCode": {
+      "case-study-needs-review": 8,
+      "unverified-authorship": 2,
+      "summary-length": 4,
+      "screenshot-capture-issue": 6
+    }
+  },
+  "entries": [
+    {
+      "slug": "allpointsadvising-com",
+      "title": "All Points Advising",
+      "warnings": [
+        {
+          "code": "case-study-needs-review",
+          "message": "Case-study fields need review: outcomes, status.",
+          "remediation": "Verify or complete the listed case-study fields before publication."
+        },
+        {
+          "code": "unverified-authorship",
+          "message": "Contribution or outcome claims have no repository or authored-note evidence.",
+          "remediation": "Add a repository or authored notes that substantiate the claimed contribution."
+        }
+      ]
+    },
+    {
+      "slug": "andribraun-dev-payload-cms",
+      "title": "Portfolio CMS",
+      "warnings": [
+        {
+          "code": "case-study-needs-review",
+          "message": "Case-study fields need review: summary.",
+          "remediation": "Verify or complete the listed case-study fields before publication."
+        },
+        {
+          "code": "summary-length",
+          "message": "The case-study summary is outside the 20–45-word range.",
+          "remediation": "Edit the summary to a concise standalone blurb between 20 and 45 words."
+        }
+      ]
+    },
+    {
+      "slug": "entity-inc",
+      "title": "Entity Inc",
+      "warnings": [
+        {
+          "code": "case-study-needs-review",
+          "message": "Case-study fields need review: outcomes, status.",
+          "remediation": "Verify or complete the listed case-study fields before publication."
+        },
+        {
+          "code": "unverified-authorship",
+          "message": "Contribution or outcome claims have no repository or authored-note evidence.",
+          "remediation": "Add a repository or authored notes that substantiate the claimed contribution."
+        }
+      ]
+    },
+    {
+      "slug": "expatfinancial-solutions",
+      "title": "Expat Financial Solutions",
+      "warnings": [
+        {
+          "code": "case-study-needs-review",
+          "message": "Case-study fields need review: business_challenge, contribution_highlights, outcomes, status.",
+          "remediation": "Verify or complete the listed case-study fields before publication."
+        },
+        {
+          "code": "screenshot-capture-issue",
+          "message": "Home was captured with a detected cookie consent issue.",
+          "remediation": "Review the image and recapture it after resolving the visible page-state issue."
+        },
+        {
+          "code": "screenshot-capture-issue",
+          "message": "Schedule A Call was captured with a detected cookie consent issue.",
+          "remediation": "Review the image and recapture it after resolving the visible page-state issue."
+        },
+        {
+          "code": "screenshot-capture-issue",
+          "message": "Services Financial Planning was captured with a detected cookie consent issue.",
+          "remediation": "Review the image and recapture it after resolving the visible page-state issue."
+        },
+        {
+          "code": "screenshot-capture-issue",
+          "message": "Services Investment Management was captured with a detected cookie consent issue.",
+          "remediation": "Review the image and recapture it after resolving the visible page-state issue."
+        },
+        {
+          "code": "screenshot-capture-issue",
+          "message": "Why Us was captured with a detected cookie consent issue.",
+          "remediation": "Review the image and recapture it after resolving the visible page-state issue."
+        }
+      ]
+    },
+    {
+      "slug": "geobeermap",
+      "title": "GeoBeerMap",
+      "warnings": [
+        {
+          "code": "case-study-needs-review",
+          "message": "Case-study fields need review: outcomes, status, summary.",
+          "remediation": "Verify or complete the listed case-study fields before publication."
+        },
+        {
+          "code": "summary-length",
+          "message": "The case-study summary is outside the 20–45-word range.",
+          "remediation": "Edit the summary to a concise standalone blurb between 20 and 45 words."
+        }
+      ]
+    },
+    {
+      "slug": "glyphin",
+      "title": "Glyphin",
+      "warnings": [
+        {
+          "code": "case-study-needs-review",
+          "message": "Case-study fields need review: client_name, business_challenge, outcomes, status, contribution_highlights, summary.",
+          "remediation": "Verify or complete the listed case-study fields before publication."
+        },
+        {
+          "code": "summary-length",
+          "message": "The case-study summary is outside the 20–45-word range.",
+          "remediation": "Edit the summary to a concise standalone blurb between 20 and 45 words."
+        }
+      ]
+    },
+    {
+      "slug": "online-taxman",
+      "title": "Online Taxman",
+      "warnings": [
+        {
+          "code": "case-study-needs-review",
+          "message": "Case-study fields need review: summary, business_challenge, outcomes, status, contribution_highlights.",
+          "remediation": "Verify or complete the listed case-study fields before publication."
+        },
+        {
+          "code": "summary-length",
+          "message": "The case-study summary is outside the 20–45-word range.",
+          "remediation": "Edit the summary to a concise standalone blurb between 20 and 45 words."
+        }
+      ]
+    },
+    {
+      "slug": "talkspark",
+      "title": "TalkSpark",
+      "warnings": []
+    },
+    {
+      "slug": "yourmove-ge",
+      "title": "YourMove.ge",
+      "warnings": [
+        {
+          "code": "case-study-needs-review",
+          "message": "Case-study fields need review: client_name, contribution_highlights, outcomes, status, business_challenge.",
+          "remediation": "Verify or complete the listed case-study fields before publication."
+        },
+        {
+          "code": "screenshot-capture-issue",
+          "message": "Home was captured with a detected page error issue.",
+          "remediation": "Review the image and recapture it after resolving the visible page-state issue."
+        }
+      ]
+    }
+  ]
+}

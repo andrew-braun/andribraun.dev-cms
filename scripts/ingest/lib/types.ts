@@ -2,6 +2,8 @@
  * Shared types for the portfolio ingest pipeline.
  */
 
+import type { ScreenshotCaptureIssue } from './screenshotQuality'
+
 export interface ShotSpec {
   /** Descriptive label used in the media filename: `<Title> - <Label>.png`. */
   label: string
@@ -12,6 +14,8 @@ export interface ShotSpec {
 export interface CapturedShot extends ShotSpec {
   /** AI-generated alt text describing the screenshot. */
   alt: string
+  /** Visible page-state issues detected while the screenshot was captured. */
+  captureIssues?: ScreenshotCaptureIssue[]
   /** File name relative to the entry's `shots/` directory. */
   file: string
   height: number

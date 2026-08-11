@@ -38,6 +38,7 @@ export const ROOT = path.resolve(import.meta.dirname, '../../..')
 
 export const INGEST_DIR = resolveContained(ROOT, 'ingest')
 export const MANIFEST_PATH = resolveContained(INGEST_DIR, 'manifest.json')
+export const QUALITY_REPORT_PATH = resolveContained(INGEST_DIR, 'quality-report.json')
 export const WORK_DIR = resolveContained(INGEST_DIR, 'work')
 
 /**

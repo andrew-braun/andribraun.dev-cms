@@ -122,13 +122,24 @@ describe('normalizeCaseStudy', () => {
 })
 
 describe('preferWriteupSummary', () => {
-  it('replaces a malformed model summary with the grounded writeup introduction', () => {
+  it('preserves a valid 20–45 word generated summary', () => {
+    const summary =
+      'A focused platform for advisors that organizes student applications, deadlines, and next steps while helping each applicant receive practical one-to-one guidance throughout the process.'
+
     expect(
-      preferWriteupSummary(
-        { needsReview: [], summary: "Good start.','business_challenge':" },
-        'Grounded first paragraph from the completed writeup.\n\n## Tech Stack & Architecture\n\n- TypeScript',
-      ).summary,
-    ).toBe('Grounded first paragraph from the completed writeup.')
+      preferWriteupSummary({ needsReview: [], summary }, 'A much longer writeup introduction.')
+        .summary,
+    ).toBe(summary)
+  })
+
+  it('uses a review-marked 20–45 word fallback when the generated summary is invalid', () => {
+    const result = preferWriteupSummary(
+      { needsReview: [], summary: 'Too brief.' },
+      'The platform gives advisors a focused workspace for coordinating student applications, deadlines, and decisions while keeping every applicant informed about the next practical step.',
+    )
+
+    expect(result.needsReview).toContain('summary')
+    expect(result.summary?.trim().split(/\s+/)).toHaveLength(24)
   })
 })
 

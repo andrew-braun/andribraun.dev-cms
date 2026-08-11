@@ -12,6 +12,14 @@ export async function runBatch<T extends { slug: string }>(
       const message = error instanceof Error ? error.message : String(error)
       failures.push({ slug: entry.slug, message })
       log.error(`${entry.slug}: ${message}`)
+      if (
+        error &&
+        typeof error === 'object' &&
+        'fatal' in error &&
+        (error as { fatal?: unknown }).fatal === true
+      ) {
+        throw error instanceof Error ? error : new IngestError(message)
+      }
     }
   }
   if (failures.length > 0) {

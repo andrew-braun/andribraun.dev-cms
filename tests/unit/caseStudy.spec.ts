@@ -1,10 +1,62 @@
 import { describe, expect, it } from 'vitest'
 
+import { renderCaseStudyBriefing } from '../../scripts/ingest/lib/ai'
 import {
   CASE_STUDY_FIELD_KEYS,
+  caseStudyOutputSchema,
   emptyCaseStudyStub,
   normalizeCaseStudy,
+  preferWriteupSummary,
+  validateCaseStudySidecar,
+  validateGeneratedCaseStudy,
 } from '../../scripts/ingest/lib/caseStudy'
+
+describe('case-study briefing', () => {
+  it('includes assessed evidence and the writeup without raw repository content or trees', () => {
+    const briefing = renderCaseStudyBriefing({
+      assessment: {
+        slug: 'alpha',
+        analysisFingerprint: 'a'.repeat(64),
+        findings: [
+          {
+            category: 'architecture',
+            claim: 'The app uses a service boundary.',
+            confidence: 'high',
+            evidence: [{ path: 'src/service.ts', rationale: 'Exports the service interface.' }],
+          },
+        ],
+        generatedAt: '2026-08-09T00:00:00.000Z',
+        repository: 'example/alpha',
+        status: 'assessed',
+        technologies: ['TypeScript'],
+        unknowns: [],
+        version: 1,
+      },
+      context: {
+        slug: 'alpha',
+        gatheredAt: '2026-08-09T00:00:00.000Z',
+        repo: {
+          defaultBranch: 'main',
+          files: { 'src/service.ts': 'SECRET_SOURCE_BODY' },
+          languages: { TypeScript: 100 },
+          repo: 'example/alpha',
+          topics: [],
+          tree: ['src/service.ts', 'private/tree-only.txt'],
+        },
+        site: { navLinks: [], ok: true, signals: ['Next.js'], url: 'https://alpha.test/' },
+        title: 'Alpha',
+      },
+      notes: 'Built for a client team.',
+      writeup: 'Completed portfolio writeup.',
+    })
+
+    expect(briefing).toContain('The app uses a service boundary.')
+    expect(briefing).toContain('src/service.ts')
+    expect(briefing).toContain('Completed portfolio writeup.')
+    expect(briefing).not.toContain('SECRET_SOURCE_BODY')
+    expect(briefing).not.toContain('private/tree-only.txt')
+  })
+})
 
 describe('emptyCaseStudyStub', () => {
   it('flags every case-study field for review', () => {
@@ -58,5 +110,71 @@ describe('normalizeCaseStudy', () => {
 
   it('returns a full stub for non-objects', () => {
     expect(normalizeCaseStudy(null).needsReview).toEqual([...CASE_STUDY_FIELD_KEYS])
+  })
+
+  it('treats empty optional model fields as omitted and flags them for review', () => {
+    const result = validateGeneratedCaseStudy({ client_name: '', needsReview: ['client_name'] })
+
+    expect(result.client_name).toBeUndefined()
+    expect(result.needsReview).toContain('client_name')
+    expect(() => validateCaseStudySidecar(result)).not.toThrow()
+  })
+})
+
+describe('preferWriteupSummary', () => {
+  it('replaces a malformed model summary with the grounded writeup introduction', () => {
+    expect(
+      preferWriteupSummary(
+        { needsReview: [], summary: "Good start.','business_challenge':" },
+        'Grounded first paragraph from the completed writeup.\n\n## Tech Stack & Architecture\n\n- TypeScript',
+      ).summary,
+    ).toBe('Grounded first paragraph from the completed writeup.')
+  })
+})
+
+describe('stored case-study validation', () => {
+  it('accepts a normalized sidecar with explicit review fields', () => {
+    const sidecar = normalizeCaseStudy({
+      business_challenge: 'A clear challenge.',
+      needsReview: ['client_name'],
+      status: 'live',
+      summary: 'A concise summary.',
+    })
+    expect(validateCaseStudySidecar(sidecar)).toEqual(sidecar)
+  })
+
+  it('rejects parseable JSON that is not a valid sidecar', () => {
+    expect(() => validateCaseStudySidecar({})).toThrow('needsReview must be an array')
+    expect(() => validateCaseStudySidecar({ needsReview: [], status: 'shipping' })).toThrow(
+      'status is invalid',
+    )
+    expect(() =>
+      validateCaseStudySidecar({ contribution_highlights: [{ statement: '' }], needsReview: [] }),
+    ).toThrow('contribution_highlights contains an invalid row')
+  })
+
+  it('enforces schema bounds locally after wire-schema transformation', () => {
+    expect(() => validateCaseStudySidecar({ needsReview: [], summary: 'x'.repeat(801) })).toThrow(
+      'summary must be at most 800 characters',
+    )
+    expect(() =>
+      validateCaseStudySidecar({
+        contribution_highlights: Array.from({ length: 7 }, () => ({ statement: 'Built it.' })),
+        needsReview: [],
+      }),
+    ).toThrow('contribution_highlights must contain at most 6 rows')
+    expect(() =>
+      validateCaseStudySidecar({ needsReview: [...CASE_STUDY_FIELD_KEYS, 'summary'] }),
+    ).toThrow('needsReview must contain at most 6 fields')
+  })
+})
+
+describe('case-study output schema bounds', () => {
+  it('bounds freeform strings and arrays to prevent token-limit decoder loops', () => {
+    const summary = caseStudyOutputSchema.properties?.summary
+    const outcomes = caseStudyOutputSchema.properties?.outcomes
+
+    expect(summary).toMatchObject({ type: 'string', maxLength: 800 })
+    expect(outcomes).toMatchObject({ type: 'array', maxItems: 6 })
   })
 })

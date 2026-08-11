@@ -19,6 +19,10 @@ export interface JsonSchema {
   description?: string
   enum?: string[]
   items?: JsonSchema
+  maxItems?: number
+  maxLength?: number
+  minItems?: number
+  minLength?: number
   properties?: Record<string, { enum?: string[]; items?: JsonSchema; type: string } | JsonSchema>
   required?: string[]
   type: string
@@ -63,6 +67,47 @@ export class ClaudeAPIError extends Error {
     super(message)
     this.name = 'ClaudeAPIError'
   }
+
+  /** Client-side API failures affect every remaining item in an ingest batch. */
+  get fatal(): boolean {
+    return this.statusCode !== undefined && this.statusCode >= 400 && this.statusCode < 500
+  }
+}
+
+const UNSUPPORTED_SCHEMA_BOUNDS = ['maxItems', 'maxLength', 'minItems', 'minLength'] as const
+
+/**
+ * Anthropic's raw Messages API accepts only a JSON Schema subset. Official
+ * SDKs strip unsupported bounds and retain them as descriptions before
+ * sending; this fetch-based client performs the same wire transformation while
+ * domain validators continue enforcing the original schema locally.
+ */
+function schemaForClaude(schema: JsonSchema): JsonSchema {
+  const transformed: JsonSchema = { ...schema }
+  const constraints: string[] = []
+
+  for (const key of UNSUPPORTED_SCHEMA_BOUNDS) {
+    const value = transformed[key]
+    if (value !== undefined) {
+      constraints.push(`${key}=${value}`)
+      delete transformed[key]
+    }
+  }
+
+  if (constraints.length > 0) {
+    transformed.description = [schema.description, `Constraints: ${constraints.join(', ')}`]
+      .filter(Boolean)
+      .join(' ')
+  }
+  if (schema.items) {
+    transformed.items = schemaForClaude(schema.items)
+  }
+  if (schema.properties) {
+    transformed.properties = Object.fromEntries(
+      Object.entries(schema.properties).map(([key, value]) => [key, schemaForClaude(value)]),
+    )
+  }
+  return transformed
 }
 
 export async function sendMessage(
@@ -94,7 +139,7 @@ export async function sendMessage(
   if (outputSchema) {
     outputConfig.format = {
       type: 'json_schema',
-      schema: outputSchema,
+      schema: schemaForClaude(outputSchema),
     }
   }
 
@@ -158,6 +203,45 @@ export function getTextContent(response: ClaudeResponse): string {
   // Thinking-enabled models put a `thinking` block first, so select by type
   // rather than position.
   return response.content.find((block) => block.type === 'text')?.text || ''
+}
+
+/** Rejects incomplete prose so callers never persist a token-truncated draft. */
+export function parseTextResponse(response: ClaudeResponse): string {
+  if (response.stop_reason !== 'end_turn') {
+    throw new ClaudeAPIError(
+      `Claude did not complete text output (stop reason: ${response.stop_reason})`,
+    )
+  }
+  const text = getTextContent(response)
+  if (!text.trim()) {
+    throw new ClaudeAPIError('Claude returned empty text output')
+  }
+  return text
+}
+
+/**
+ * Parses a JSON response produced through Anthropic's structured-output mode.
+ * A syntactically valid prefix is not a completed response: token exhaustion,
+ * refusals, and tool turns must be surfaced to the caller instead of becoming
+ * fallback content.
+ */
+export function parseStructuredResponse<T>(response: ClaudeResponse): T {
+  if (response.stop_reason !== 'end_turn') {
+    throw new ClaudeAPIError(
+      `Claude did not complete structured output (stop reason: ${response.stop_reason})`,
+    )
+  }
+
+  const text = getTextContent(response).trim()
+  if (!text) {
+    throw new ClaudeAPIError('Claude returned empty structured output')
+  }
+
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new ClaudeAPIError('Claude returned invalid structured JSON')
+  }
 }
 
 export function parseJsonFromResponse<T>(response: ClaudeResponse, fallback: T): T {

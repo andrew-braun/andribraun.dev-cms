@@ -14,4 +14,12 @@ describe('ingest operator contract', () => {
     expect(docs).toContain('--visible=false')
     expect(docs).toContain('omitted fields preserve')
   })
+
+  it('documents the source-backed assessment stage and strict AI failures', async () => {
+    const docs = await fs.readFile('docs/ingest.md', 'utf8')
+    expect(docs).toContain('repo-assessment.json')
+    expect(docs).toContain('must cite an exact file path')
+    expect(docs).toContain('`max_tokens`')
+    expect(docs).not.toContain('a stub sidecar')
+  })
 })

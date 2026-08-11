@@ -28,23 +28,76 @@ async function fixture(entryChange: Partial<ManifestEntry> = {}, notes = 'old no
   }
   const inputs = fingerprintsFor(entry, notes)
   entry.stages = {
+    analysisArtifact: 'b'.repeat(64),
     analysisInput: inputs.analysis,
     analyzedAt: '2026-08-01T00:00:00.000Z',
+    assessedAt: '2026-08-01T00:00:00.000Z',
+    caseStudyAt: '2026-08-01T00:00:00.000Z',
     shotsAt: '2026-08-01T00:00:00.000Z',
     shotsInput: inputs.shots,
     writeupAt: '2026-08-01T00:00:00.000Z',
   }
+  entry.stages.assessmentInput = fingerprintsFor(entry, notes).assessment
   entry.stages.writeupInput = fingerprintsFor(entry, notes).writeup
+  entry.stages.caseStudyInput = fingerprintsFor(entry, notes).caseStudy
 
   const entryDir = path.join(workDir, entry.slug)
   await fs.mkdir(path.join(entryDir, 'shots'), { recursive: true })
   await Promise.all([
-    fs.writeFile(path.join(entryDir, 'context.json'), '{}'),
+    fs.writeFile(
+      path.join(entryDir, 'context.json'),
+      JSON.stringify({
+        slug: 'alpha',
+        gatheredAt: '2026-08-01T00:00:00.000Z',
+        repo: {
+          defaultBranch: 'main',
+          files: { 'package.json': '{}' },
+          languages: {},
+          repo: 'example/alpha',
+          topics: [],
+          tree: ['package.json'],
+        },
+        title: 'Alpha',
+      }),
+    ),
     fs.writeFile(path.join(entryDir, 'context.md'), 'context'),
+    fs.writeFile(
+      path.join(entryDir, 'repo-assessment.json'),
+      JSON.stringify({
+        slug: 'alpha',
+        analysisFingerprint: 'b'.repeat(64),
+        findings: [
+          {
+            category: 'technology',
+            claim: 'The repository has a package manifest.',
+            confidence: 'high',
+            evidence: [{ path: 'package.json', rationale: 'The file was analyzed.' }],
+          },
+        ],
+        generatedAt: '2026-08-01T00:00:00.000Z',
+        repository: 'example/alpha',
+        status: 'assessed',
+        technologies: [],
+        unknowns: [],
+        version: 1,
+      }),
+    ),
     fs.writeFile(path.join(entryDir, 'shots', 'old.png'), 'old'),
     fs.writeFile(path.join(entryDir, 'shots.json'), '[]'),
     fs.writeFile(path.join(entryDir, 'writeup.md'), 'writeup'),
-    fs.writeFile(path.join(entryDir, 'case-study.json'), '{}'),
+    fs.writeFile(
+      path.join(entryDir, 'case-study.json'),
+      JSON.stringify({
+        needsReview: [
+          'summary',
+          'client_name',
+          'business_challenge',
+          'contribution_highlights',
+          'outcomes',
+          'status',
+        ],
+      }),
+    ),
   ])
 
   const changed = { ...entry, ...entryChange }
@@ -83,16 +136,22 @@ describe('atomic artifacts', () => {
 
 describe('dependency invalidation', () => {
   it('a completed analysis or screenshot run invalidates derived prose', () => {
-    expect(invalidateDerivedArtifacts('analysis')).toEqual(['writeup', 'caseStudy'])
+    expect(invalidateDerivedArtifacts('analysis')).toEqual(['assessment', 'writeup', 'caseStudy'])
+    expect(invalidateDerivedArtifacts('assessment')).toEqual(['caseStudy'])
     expect(invalidateDerivedArtifacts('shots')).toEqual(['writeup', 'caseStudy'])
+    expect(invalidateDerivedArtifacts('writeup')).toEqual(['caseStudy'])
   })
 
   it.each([
-    ['liveUrl', { liveUrl: 'https://new.example/' }, ['analysis', 'shots', 'writeup', 'caseStudy']],
+    [
+      'liveUrl',
+      { liveUrl: 'https://new.example/' },
+      ['analysis', 'assessment', 'shots', 'writeup', 'caseStudy'],
+    ],
     [
       'githubLink',
       { githubLink: 'https://github.com/example/new' },
-      ['analysis', 'writeup', 'caseStudy'],
+      ['analysis', 'assessment', 'writeup', 'caseStudy'],
     ],
     [
       'screenshots',
@@ -109,9 +168,10 @@ describe('dependency invalidation', () => {
     })
     const invalidated = [
       ['analysis', !result.stages.analyzedAt],
+      ['assessment', !result.stages.assessedAt],
       ['shots', !result.stages.shotsAt],
       ['writeup', !result.stages.writeupAt],
-      ['caseStudy', !(await exists(path.join(state.entryDir, 'case-study.json')))],
+      ['caseStudy', !result.stages.caseStudyAt],
     ]
       .filter(([, removed]) => removed)
       .map(([stage]) => stage)
@@ -125,9 +185,59 @@ describe('dependency invalidation', () => {
       workDir: state.workDir,
     })
     expect(result.stages.analyzedAt).toBeDefined()
+    expect(result.stages.assessedAt).toBeDefined()
     expect(result.stages.shotsAt).toBeDefined()
     expect(result.stages.writeupAt).toBeUndefined()
+    expect(result.stages.caseStudyAt).toBeUndefined()
+  })
+
+  it('recording an assessment preserves the writeup and invalidates only the case study', async () => {
+    const state = await fixture()
+    const completed = await recordStageCompletion(
+      'alpha',
+      'assessment',
+      '2026-08-09T01:02:03.000Z',
+      state.notes,
+      { manifestPath: state.manifestPath, workDir: state.workDir },
+    )
+
+    expect(completed.stages.writeupAt).toBeDefined()
+    await expect(exists(path.join(state.entryDir, 'writeup.md'))).resolves.toBe(true)
+    expect(completed.stages.caseStudyAt).toBeUndefined()
     await expect(exists(path.join(state.entryDir, 'case-study.json'))).resolves.toBe(false)
+  })
+
+  it('invalidates a stored assessment whose evidence path is not in analyzed files', async () => {
+    const state = await fixture()
+    const target = path.join(state.entryDir, 'repo-assessment.json')
+    const assessment = JSON.parse(await fs.readFile(target, 'utf8'))
+    assessment.findings[0].evidence[0].path = 'src/not-analyzed.ts'
+    await fs.writeFile(target, JSON.stringify(assessment))
+
+    const result = await reconcileEntryArtifacts('alpha', state.notes, {
+      manifestPath: state.manifestPath,
+      workDir: state.workDir,
+    })
+
+    expect(result.stages.assessedAt).toBeUndefined()
+    expect(result.stages.writeupAt).toBeDefined()
+    expect(result.stages.caseStudyAt).toBeUndefined()
+    await expect(exists(target)).resolves.toBe(false)
+  })
+
+  it('invalidates parseable case-study JSON that does not satisfy the sidecar contract', async () => {
+    const state = await fixture()
+    const target = path.join(state.entryDir, 'case-study.json')
+    await fs.writeFile(target, '{}')
+
+    const result = await reconcileEntryArtifacts('alpha', state.notes, {
+      manifestPath: state.manifestPath,
+      workDir: state.workDir,
+    })
+
+    expect(result.stages.writeupAt).toBeDefined()
+    expect(result.stages.caseStudyAt).toBeUndefined()
+    await expect(exists(target)).resolves.toBe(false)
   })
 
   it('baselines a legacy timestamp without deleting its valid artifact', async () => {
@@ -156,6 +266,8 @@ describe('dependency invalidation', () => {
 
     expect(completed.stages.analyzedAt).toBe('2026-08-09T01:02:03.000Z')
     expect(completed.stages.analysisInput).toMatch(/^[a-f0-9]{64}$/)
+    expect(completed.stages.assessedAt).toBeUndefined()
+    await expect(exists(path.join(state.entryDir, 'repo-assessment.json'))).resolves.toBe(false)
     expect(completed.stages.writeupAt).toBeUndefined()
     await expect(exists(path.join(state.entryDir, 'writeup.md'))).resolves.toBe(false)
     await expect(exists(path.join(state.entryDir, 'case-study.json'))).resolves.toBe(false)

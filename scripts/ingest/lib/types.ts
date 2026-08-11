@@ -21,8 +21,13 @@ export interface CapturedShot extends ShotSpec {
 }
 
 export interface StageState {
+  analysisArtifact?: string
   analysisInput?: string
   analyzedAt?: string
+  assessedAt?: string
+  assessmentInput?: string
+  caseStudyAt?: string
+  caseStudyInput?: string
   shotsAt?: string
   shotsInput?: string
   writeupAt?: string

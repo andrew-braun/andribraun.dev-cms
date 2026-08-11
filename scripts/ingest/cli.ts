@@ -10,6 +10,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { analyze } from './commands/analyze'
+import { assess } from './commands/assess'
 import { discover } from './commands/discover'
 import { notes } from './commands/notes'
 import { publish } from './commands/publish'
@@ -23,6 +24,7 @@ import { IngestError, log } from './lib/log'
 
 const COMMANDS: Record<string, (args: ParsedArgs) => Promise<void>> = {
   analyze,
+  assess,
   discover,
   notes,
   publish,
@@ -43,6 +45,7 @@ const COMMANDS: Record<string, (args: ParsedArgs) => Promise<void>> = {
  */
 const KNOWN_FLAGS: Record<string, string[]> = {
   analyze: ['force'],
+  assess: ['force'],
   discover: ['all', 'archived', 'forks', 'limit', 'no-github', 'owner', 'urls'],
   notes: [],
   publish: ['dry-run', 'no-tech', 'remote', 'visible'],
@@ -79,6 +82,7 @@ Portfolio ingest pipeline
 Commands
   discover   Scan GitHub and/or accept site URLs; seed ingest/manifest.json
   analyze    Gather repo context and probe the live site  → work/<slug>/context.{json,md}
+  assess     Build a cited AI repository assessment      → work/<slug>/repo-assessment.json
   notes      Scaffold hand-written background notes       → ingest/notes/<slug>.md
   writeup    Generate description_markdown + case-study.json with Claude
              → work/<slug>/writeup.md, case-study.json
@@ -103,6 +107,7 @@ Flags
              --forks         Include forks       --archived  Include archived repos
              --no-github     URLs only; skip the GitHub scan
   analyze    --force         Re-gather even if already analyzed
+  assess     --force         Regenerate a repository assessment
   writeup    --force         Regenerate an existing write-up
   shots      --force         Recapture       --max=<n>  Override maxShots
              --no-alt        Skip AI alt-text generation
@@ -122,6 +127,7 @@ Typical run
   pnpm ingest discover --urls=ingest/urls.txt
   $EDITOR ingest/manifest.json          # set titles, unskip what you want
   pnpm ingest analyze
+  pnpm ingest assess
   pnpm ingest notes                     # then fill in ingest/notes/<slug>.md
   pnpm ingest writeup && pnpm ingest shots
 

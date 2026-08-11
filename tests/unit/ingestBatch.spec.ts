@@ -16,4 +16,17 @@ describe('runBatch', () => {
     ).rejects.toThrow('1 of 2 entries failed')
     expect(visited).toEqual(['a', 'b'])
   })
+
+  it('stops after a fatal shared-service failure', async () => {
+    const visited: string[] = []
+    const fatal = Object.assign(new Error('billing unavailable'), { fatal: true })
+
+    await expect(
+      runBatch([{ slug: 'a' }, { slug: 'b' }], (entry) => {
+        visited.push(entry.slug)
+        return Promise.reject(fatal)
+      }),
+    ).rejects.toThrow('billing unavailable')
+    expect(visited).toEqual(['a'])
+  })
 })

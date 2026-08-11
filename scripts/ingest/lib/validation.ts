@@ -135,8 +135,13 @@ function nullableShots(value: unknown, field: string): null | ShotSpec[] | undef
 function stageState(value: unknown, field: string): StageState {
   const raw = object(value, field)
   return {
+    analysisArtifact: optionalFingerprint(raw.analysisArtifact, `${field}.analysisArtifact`),
     analysisInput: optionalFingerprint(raw.analysisInput, `${field}.analysisInput`),
     analyzedAt: optionalTimestamp(raw.analyzedAt, `${field}.analyzedAt`),
+    assessedAt: optionalTimestamp(raw.assessedAt, `${field}.assessedAt`),
+    assessmentInput: optionalFingerprint(raw.assessmentInput, `${field}.assessmentInput`),
+    caseStudyAt: optionalTimestamp(raw.caseStudyAt, `${field}.caseStudyAt`),
+    caseStudyInput: optionalFingerprint(raw.caseStudyInput, `${field}.caseStudyInput`),
     shotsAt: optionalTimestamp(raw.shotsAt, `${field}.shotsAt`),
     shotsInput: optionalFingerprint(raw.shotsInput, `${field}.shotsInput`),
     writeupAt: optionalTimestamp(raw.writeupAt, `${field}.writeupAt`),

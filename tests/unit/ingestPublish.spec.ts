@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { PublishBackend } from '../../scripts/ingest/lib/backend'
 import type { ManifestEntry } from '../../scripts/ingest/lib/types'
 
-import { publishEntry } from '../../scripts/ingest/commands/publish'
+import { publicationReadinessIssue, publishEntry } from '../../scripts/ingest/commands/publish'
 
 const entry: ManifestEntry = {
   slug: 'alpha',
@@ -92,5 +92,32 @@ describe('publishEntry ordering', () => {
       publishEntry(entry, { backend: fixture.backend }, fixture.dependencies),
     ).resolves.toBe(7)
     expect(fixture.calls).toEqual(['validate', 'resolve', 'upload', 'create', 'record', 'extract'])
+  })
+})
+
+describe('publication readiness', () => {
+  it('requires a separately completed case-study stage', () => {
+    expect(
+      publicationReadinessIssue({
+        ...entry,
+        stages: {
+          assessedAt: '2026-08-09T00:00:00.000Z',
+          writeupAt: '2026-08-09T00:00:00.000Z',
+        },
+      }),
+    ).toBe('case study')
+  })
+
+  it('accepts entries with all required prose stages', () => {
+    expect(
+      publicationReadinessIssue({
+        ...entry,
+        stages: {
+          assessedAt: '2026-08-09T00:00:00.000Z',
+          caseStudyAt: '2026-08-09T00:00:00.000Z',
+          writeupAt: '2026-08-09T00:00:00.000Z',
+        },
+      }),
+    ).toBeUndefined()
   })
 })

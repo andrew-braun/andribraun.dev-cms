@@ -13,17 +13,26 @@
     {
       "slug": "allpointsadvising-com",
       "liveUrl": "https://allpointsadvising.com/",
-      "stages": {
-        "analyzedAt": "2026-08-03T15:03:17.899Z",
-        "writeupAt": "2026-08-03T15:36:04.580Z"
-      },
-      "title": "All Points Advising",
       "publishedTo": {
         "localhost:5432/devsite": {
           "id": 3,
-          "at": "2026-08-08T08:23:18.519Z"
+          "at": "2026-08-09T15:56:37.434Z"
         }
-      }
+      },
+      "stages": {
+        "analysisArtifact": "a065d6cf71f127cdaf342f3f4e84c26601ee30583de49bd97776335c12c31be6",
+        "analysisInput": "2e8cfc2a75b77bd125fe638664ac1337de4b0fd75b159e39bda70cd38608b615",
+        "analyzedAt": "2026-08-09T09:59:02.870Z",
+        "assessedAt": "2026-08-09T10:00:03.317Z",
+        "assessmentInput": "e805ccf5702e3ec68b927cdb65c0a0a43f75544f2a49969b3256a164f33315bb",
+        "caseStudyAt": "2026-08-09T15:52:56.060Z",
+        "caseStudyInput": "67cdcbba329d9c9ea68e463a613b74e420df599ae02426bf79e0a78f57cd5d5a",
+        "shotsAt": "2026-08-09T10:13:23.209Z",
+        "shotsInput": "7c6f6e1cb3005d194dcedc68c718b9a98001acf8208830938a087da00ff8ffeb",
+        "writeupAt": "2026-08-09T15:52:56.046Z",
+        "writeupInput": "bb6ed273da19d80903b677dc99e9385016f7b7ae510a5932d024bd35b897a32a"
+      },
+      "title": "All Points Advising"
     },
     {
       "slug": "andrew-braun",
@@ -51,21 +60,28 @@
     },
     {
       "slug": "andribraun-dev-payload-cms",
-      "githubLink": "https://github.com/andrew-braun/andribraun.dev-cms",
-      "repo": "andrew-braun/andribraun.dev-cms",
-      "skip": false,
       "cardType": "text",
-      "stages": {
-        "analyzedAt": "2026-08-03T15:24:17.351Z",
-        "writeupAt": "2026-08-03T15:36:39.307Z"
-      },
-      "title": "Portfolio CMS",
+      "githubLink": "https://github.com/andrew-braun/andribraun.dev-cms",
       "publishedTo": {
         "localhost:5432/devsite": {
           "id": 4,
-          "at": "2026-08-08T08:23:33.357Z"
+          "at": "2026-08-09T15:56:37.456Z"
         }
-      }
+      },
+      "repo": "andrew-braun/andribraun.dev-cms",
+      "skip": false,
+      "stages": {
+        "analysisArtifact": "1aa71c3b79c87c448f166fd2786f7b4d8d5cbf29ec664260d40282d8ee317047",
+        "analysisInput": "3a6017bd65f721008b289adce6f907bf98fdac32aaef8c4f52446f17365bb756",
+        "analyzedAt": "2026-08-09T09:59:06.647Z",
+        "assessedAt": "2026-08-09T12:49:11.853Z",
+        "assessmentInput": "d8bd00b40fcc4d45827ad0d9c4254cafcd6634c214590c9e89874f64174fb0e9",
+        "caseStudyAt": "2026-08-09T15:46:26.973Z",
+        "caseStudyInput": "40006adb1abf7c6778cfc7c405f6ad089d1feab026fb79caf91f6761f4ccb776",
+        "writeupAt": "2026-08-09T15:46:26.941Z",
+        "writeupInput": "de4a501408a9c4957b1fe37f16257be048575c484f1b28767f3807c36be1719a"
+      },
+      "title": "Portfolio CMS"
     },
     {
       "slug": "azure-cloudinary-prune",
@@ -103,6 +119,12 @@
     {
       "slug": "entity-inc",
       "liveUrl": "https://www.entity.inc/",
+      "publishedTo": {
+        "localhost:5432/devsite": {
+          "id": 5,
+          "at": "2026-08-09T13:06:54.062Z"
+        }
+      },
       "screenshots": [
         {
           "label": "Home",
@@ -126,31 +148,43 @@
         }
       ],
       "stages": {
-        "analyzedAt": "2026-08-03T15:10:12.489Z",
-        "writeupAt": "2026-08-03T15:37:00.713Z"
+        "analysisArtifact": "f3020501bfb117460eb446e1c6745a6fcab2e6d04a07034c342a23c686546f90",
+        "analysisInput": "31e25542d814ab1c4588335d65e483dc9d8186c871a21c6f6a6b28b7443575b9",
+        "analyzedAt": "2026-08-09T09:59:09.284Z",
+        "assessedAt": "2026-08-09T10:00:03.323Z",
+        "assessmentInput": "5f1fbc6b97f0d33f72e07279a9c8a15a5aeb6512dac8253a87363479541b558d",
+        "caseStudyAt": "2026-08-09T12:53:46.358Z",
+        "caseStudyInput": "d96141390aad7fecce4ee1a9f8e712b323887bc0e99f07734b23a1b5454d4e09",
+        "shotsAt": "2026-08-09T10:14:34.977Z",
+        "shotsInput": "c0a197dfe5f6e07921628ee9964012e614b01d2eb618cfdac7e50cebe7eacc01",
+        "writeupAt": "2026-08-09T12:53:46.354Z",
+        "writeupInput": "9c2c068fa4638970d37f5af87f7db159cbe1c8fcf4313fe988c951de52b98218"
       },
-      "title": "Entity Inc",
-      "publishedTo": {
-        "localhost:5432/devsite": {
-          "id": 5,
-          "at": "2026-08-08T08:24:01.048Z"
-        }
-      }
+      "title": "Entity Inc"
     },
     {
       "slug": "expatfinancial-solutions",
       "liveUrl": "https://expatfinancial.solutions/",
-      "stages": {
-        "analyzedAt": "2026-08-03T15:03:18.112Z",
-        "writeupAt": "2026-08-03T15:37:24.487Z"
-      },
-      "title": "Expat Financial Solutions",
       "publishedTo": {
         "localhost:5432/devsite": {
           "id": 6,
-          "at": "2026-08-08T08:24:09.568Z"
+          "at": "2026-08-09T15:56:41.086Z"
         }
-      }
+      },
+      "stages": {
+        "analysisArtifact": "bdfd6cac74b1604f23e59aaee1d2a3f7e7c2cd9085fea2349c1449f61eece0f9",
+        "analysisInput": "fb18d7bbdb1691300e6b1a4f41a84cd0d553a3383ae4b5f86827bb884b3af7c0",
+        "analyzedAt": "2026-08-09T09:59:09.672Z",
+        "assessedAt": "2026-08-09T10:00:03.330Z",
+        "assessmentInput": "f542d9fc55264ca89f8edbe696deaffb95ea3bf9c4c1f65260bae1efcb44eb71",
+        "caseStudyAt": "2026-08-09T15:53:24.783Z",
+        "caseStudyInput": "78a99cf941585d676923246ddd219a3dc4a09ccfea80d14c5fd47af78351f361",
+        "shotsAt": "2026-08-09T10:15:04.817Z",
+        "shotsInput": "d78eae057ad45268fbdb66f65016647aab60fe6024a94061c3e23dd98dd423de",
+        "writeupAt": "2026-08-09T15:53:24.769Z",
+        "writeupInput": "8bd23d60efdf333149c498a2818925c58f7a0ed927fb75e5412081365c9e69db"
+      },
+      "title": "Expat Financial Solutions"
     },
     {
       "slug": "fastify-proxy",
@@ -170,7 +204,7 @@
     {
       "slug": "gatsby-dev-blog",
       "githubLink": "https://github.com/andrew-braun/gatsby-dev-blog",
-      "liveUrl": "https://gatsby-dev-blog-ab-2355278173.gtsb.io",
+      "liveUrl": "https://gatsby-dev-blog-ab-2355278173.gtsb.io/",
       "repo": "andrew-braun/gatsby-dev-blog",
       "skip": true,
       "stages": {},
@@ -187,21 +221,29 @@
     {
       "slug": "geobeermap",
       "githubLink": "https://github.com/andrew-braun/geobeermap",
-      "liveUrl": "https://geobeermap.com",
+      "liveUrl": "https://geobeermap.com/",
+      "publishedTo": {
+        "localhost:5432/devsite": {
+          "id": 11,
+          "at": "2026-08-09T13:06:55.417Z"
+        }
+      },
       "repo": "andrew-braun/geobeermap",
       "skip": false,
       "stages": {
-        "analyzedAt": "2026-08-02T06:33:41.713Z",
-        "writeupAt": "2026-08-02T06:34:34.476Z",
-        "shotsAt": "2026-08-08T08:46:36.803Z"
+        "analysisArtifact": "92feee5e69652959433fa29da6cb2dd8a1510dfa5d9d290a1de572f72b8d270b",
+        "analysisInput": "5781fc09ecb9807598b876402f352cb21727a01390253c879f151fb3089fe3d5",
+        "analyzedAt": "2026-08-09T09:59:10.511Z",
+        "assessedAt": "2026-08-09T12:48:18.280Z",
+        "assessmentInput": "e24b2a7a9e1cb539b0e9701bd02f162bf72369f1e7d9601d7e2a0b1ec962d643",
+        "caseStudyAt": "2026-08-09T12:55:14.478Z",
+        "caseStudyInput": "8f6ed3daee7114c5193a31df03c36e87c8947bc3050d121aaa0016b803a4966e",
+        "shotsAt": "2026-08-09T10:15:23.697Z",
+        "shotsInput": "70d1e4001d42f265f504713048f74734e0e32329ade87ce79858c42b768445a9",
+        "writeupAt": "2026-08-09T12:55:14.474Z",
+        "writeupInput": "0d2854c0be1bb1d08cdefea150c569c06c9329e4d8d3fcfd48e8aaed62b8c175"
       },
-      "title": "GeoBeerMap",
-      "publishedTo": {
-        "localhost:5432/devsite": {
-          "id": 2,
-          "at": "2026-08-02T06:52:52.161Z"
-        }
-      }
+      "title": "GeoBeerMap"
     },
     {
       "slug": "geobeermap-cms",
@@ -215,13 +257,13 @@
       "slug": "glyphin",
       "githubLink": "https://github.com/andrew-braun/glyphin",
       "liveUrl": "https://glyphin.app/",
-      "repo": "andrew-braun/glyphin",
-      "skip": false,
-      "stages": {
-        "analyzedAt": "2026-08-03T15:24:20.292Z",
-        "writeupAt": "2026-08-03T15:38:08.628Z"
+      "publishedTo": {
+        "localhost:5432/devsite": {
+          "id": 7,
+          "at": "2026-08-09T13:06:57.844Z"
+        }
       },
-      "title": "Glyphin",
+      "repo": "andrew-braun/glyphin",
       "screenshots": [
         {
           "label": "Home",
@@ -244,12 +286,21 @@
           "url": "/practice"
         }
       ],
-      "publishedTo": {
-        "localhost:5432/devsite": {
-          "id": 7,
-          "at": "2026-08-08T08:24:16.426Z"
-        }
-      }
+      "skip": false,
+      "stages": {
+        "analysisArtifact": "f7e0bd4181650a240501d8af84642be0f0328a6c44efb224e64ac4cf58debd2d",
+        "analysisInput": "abf9e1196467207b2d6bc5c0378de3c7c84a348c749af0f509834648d34b362d",
+        "analyzedAt": "2026-08-09T09:59:16.864Z",
+        "assessedAt": "2026-08-09T12:49:55.245Z",
+        "assessmentInput": "d53b17e1d011b33ea9f55f4cb1180c1283af0d59b9a58c52ad9c013edaf1ae94",
+        "caseStudyAt": "2026-08-09T12:56:03.261Z",
+        "caseStudyInput": "abb6504f68688501161faeb3ec2d5bd9f6562b8ea0587cd8e9f20f02668888e2",
+        "shotsAt": "2026-08-09T10:15:38.732Z",
+        "shotsInput": "7e8bec5f84887246b7a0e27f70da957ef27188d8220dd76ce3319d1301ed74e6",
+        "writeupAt": "2026-08-09T12:56:03.258Z",
+        "writeupInput": "80e7143c6d95cd216a7eb7d215e6489e7ef8f9ec394b058710d8a895beb54e3e"
+      },
+      "title": "Glyphin"
     },
     {
       "slug": "hangtree-game",
@@ -270,7 +321,7 @@
     {
       "slug": "my-travel-map",
       "githubLink": "https://github.com/andrew-braun/my-travel-map",
-      "liveUrl": "https://my-travel-map.vercel.app",
+      "liveUrl": "https://my-travel-map.vercel.app/",
       "repo": "andrew-braun/my-travel-map",
       "skip": true,
       "stages": {},
@@ -295,13 +346,13 @@
     {
       "slug": "online-taxman",
       "liveUrl": "https://onlinetaxman.com/",
-      "repo": "andrew-braun/onlinetaxman",
-      "skip": false,
-      "stages": {
-        "analyzedAt": "2026-08-03T15:24:24.151Z",
-        "writeupAt": "2026-08-03T15:38:52.120Z"
+      "publishedTo": {
+        "localhost:5432/devsite": {
+          "id": 8,
+          "at": "2026-08-09T13:07:00.398Z"
+        }
       },
-      "title": "Online Taxman",
+      "repo": "andrew-braun/onlinetaxman",
       "screenshots": [
         {
           "label": "Home",
@@ -324,12 +375,21 @@
           "url": "/expat-tax-articles"
         }
       ],
-      "publishedTo": {
-        "localhost:5432/devsite": {
-          "id": 8,
-          "at": "2026-08-08T08:24:42.396Z"
-        }
-      }
+      "skip": false,
+      "stages": {
+        "analysisArtifact": "16aa8aa1df2530b50489fcd819fed69d6fa8d0dbae1df66268eb7153ababa4fd",
+        "analysisInput": "82a97bfab8828ff7582f715ec829ba6742c433e18070eea059d92c9a16b8f7db",
+        "analyzedAt": "2026-08-09T09:59:20.916Z",
+        "assessedAt": "2026-08-09T12:50:33.594Z",
+        "assessmentInput": "1dce0b6feabd264760f628a5bfa6117f053a362925464513fa142be894a73eb0",
+        "caseStudyAt": "2026-08-09T12:56:52.076Z",
+        "caseStudyInput": "e6d33f4bae1b2dd14a4779a4f058640fa8fcd4f44fb22ff139f600c620bec24f",
+        "shotsAt": "2026-08-09T10:16:17.920Z",
+        "shotsInput": "b4e1f0e12921aa7d34fa6b1610e5c3deed89fc513f24894dde78dffc221fda24",
+        "writeupAt": "2026-08-09T12:56:52.074Z",
+        "writeupInput": "a658e514fa62b3d1e3e4c83f660630ce06f0a1e22f1713e5fdb3ed04d01c0cf3"
+      },
+      "title": "Online Taxman"
     },
     {
       "slug": "otm-consultation-form",
@@ -436,24 +496,32 @@
       "slug": "talkspark",
       "githubLink": "https://github.com/andrew-braun/talkspark",
       "liveUrl": "https://www.talkspark.app/",
-      "repo": "andrew-braun/talkspark",
-      "skip": false,
-      "stages": {
-        "analyzedAt": "2026-08-03T14:48:37.415Z",
-        "writeupAt": "2026-08-03T14:49:34.899Z",
-        "shotsAt": "2026-08-03T14:49:56.067Z"
-      },
-      "title": "TalkSpark",
       "publishedTo": {
         "localhost:5432/devsite": {
           "id": 9,
-          "at": "2026-08-08T08:25:00.522Z"
+          "at": "2026-08-09T13:07:01.555Z"
         },
         "remote:cms.andribraun.dev": {
           "id": 8,
           "at": "2026-08-08T08:28:51.870Z"
         }
-      }
+      },
+      "repo": "andrew-braun/talkspark",
+      "skip": false,
+      "stages": {
+        "analysisArtifact": "eea4c34788bfdb7920e521e7a2626c605dd3f9c35cfe9e1e876db52094dbd56d",
+        "analysisInput": "84ab54ca24595ae1f27d92a9de5f2e442e5cf85c45de4a9985e6ea1ec3150d83",
+        "analyzedAt": "2026-08-09T09:59:25.074Z",
+        "assessedAt": "2026-08-09T12:51:05.915Z",
+        "assessmentInput": "786af3d9c6a3f2663509048715db363d5bcd5aad85102e0fc868032cd90662ff",
+        "caseStudyAt": "2026-08-09T12:57:37.051Z",
+        "caseStudyInput": "19cdaa918170dd64451fdce709459921942eb3e54193c4dca7ba239909568dfc",
+        "shotsAt": "2026-08-09T10:16:25.391Z",
+        "shotsInput": "4fafb95bc55a5e6b3c844abd46e7aa272844fe674df4d2d479c8a34a2a2f3d46",
+        "writeupAt": "2026-08-09T12:57:37.048Z",
+        "writeupInput": "ce447407370b89ca9cd05894ec13047251f79ad3a7731f44b9139c1935645af9"
+      },
+      "title": "TalkSpark"
     },
     {
       "slug": "visafilter-com",
@@ -483,6 +551,12 @@
     {
       "slug": "yourmove-ge",
       "liveUrl": "https://yourmove.ge/",
+      "publishedTo": {
+        "localhost:5432/devsite": {
+          "id": 10,
+          "at": "2026-08-09T13:07:03.961Z"
+        }
+      },
       "screenshots": [
         {
           "label": "Home",
@@ -502,18 +576,21 @@
         }
       ],
       "stages": {
-        "analyzedAt": "2026-08-03T15:03:16.963Z",
-        "writeupAt": "2026-08-03T15:39:15.736Z"
+        "analysisArtifact": "a9bbd201005540f2fdbf087ab9b84a2ab1cf3900b7215b54c85998f777570637",
+        "analysisInput": "91871e90cc21d08b1d0acd165a04aed7bd3127353bbe11af514d7fd7614dd575",
+        "analyzedAt": "2026-08-09T09:59:30.252Z",
+        "assessedAt": "2026-08-09T10:00:03.337Z",
+        "assessmentInput": "1cc9704c65084b6c049cd0fc8b8c8b41baf489fc1f75f7896b27bca9548dbee8",
+        "caseStudyAt": "2026-08-09T12:58:13.201Z",
+        "caseStudyInput": "994465fc50ab73f5638b8f7304b1ed8ac663394f78bc00d0fef2a66fbe9ec1b8",
+        "shotsAt": "2026-08-09T10:16:42.860Z",
+        "shotsInput": "08f249e2c9d73791f61704e33d8df28f9f4f5e0ec9c20fa6fb8fc1bece38e614",
+        "writeupAt": "2026-08-09T12:58:13.198Z",
+        "writeupInput": "a2c04e614923be60719f892b57950f2385ab6fb4fc684857dce7f3f7975c43a6"
       },
-      "title": "YourMove.ge",
-      "publishedTo": {
-        "localhost:5432/devsite": {
-          "id": 10,
-          "at": "2026-08-08T08:25:16.149Z"
-        }
-      }
+      "title": "YourMove.ge"
     }
   ],
-  "updatedAt": "2026-08-08T08:46:36.803Z",
+  "updatedAt": "2026-08-10T15:57:20.126Z",
   "version": 1
 }

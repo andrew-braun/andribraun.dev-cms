@@ -59,6 +59,12 @@ export const CASE_STUDY_INSTRUCTIONS_PATH = resolveContained(
   'ai/project.case-study-instructions.md',
 )
 
+/** Instructions for the source-backed repository assessment stage. */
+export const REPO_ASSESSMENT_INSTRUCTIONS_PATH = resolveContained(
+  ROOT,
+  'ai/project.repo-assessment-instructions.md',
+)
+
 export function entryDir(slug: string): string {
   return resolveContained(WORK_DIR, slug)
 }
@@ -77,6 +83,10 @@ export function writeupPath(slug: string): string {
 
 export function caseStudyPath(slug: string): string {
   return resolveContained(entryDir(slug), 'case-study.json')
+}
+
+export function repoAssessmentPath(slug: string): string {
+  return resolveContained(entryDir(slug), 'repo-assessment.json')
 }
 
 export function shotsDir(slug: string): string {

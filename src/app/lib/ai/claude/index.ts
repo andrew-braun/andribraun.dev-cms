@@ -7,5 +7,7 @@ export {
   getTextContent,
   type JsonSchema,
   parseJsonFromResponse,
+  parseStructuredResponse,
+  parseTextResponse,
   sendMessage,
 } from './client'

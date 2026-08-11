@@ -1,4 +1,7 @@
-import type { EntryContext } from '../lib/types'
+import fs from 'node:fs/promises'
+
+import type { RepoAssessment } from '../lib/repoAssessment'
+import type { EntryContext, StageState } from '../lib/types'
 
 import { generateCaseStudy, generateWriteup } from '../lib/ai'
 import { flagBoolean, type ParsedArgs } from '../lib/args'
@@ -9,12 +12,30 @@ import {
   recordStageCompletion,
 } from '../lib/artifacts'
 import { runBatch } from '../lib/batch'
-import { emptyCaseStudyStub, summaryFromWriteup } from '../lib/caseStudy'
+import { preferWriteupSummary } from '../lib/caseStudy'
 import { IngestError, log } from '../lib/log'
 import { loadManifest, readJson, selectEntries } from '../lib/manifest'
 import { readNotes } from '../lib/notes'
-import { caseStudyPath, contextPath, notesPath, rel, writeupPath } from '../lib/paths'
+import {
+  caseStudyPath,
+  contextPath,
+  notesPath,
+  rel,
+  repoAssessmentPath,
+  writeupPath,
+} from '../lib/paths'
 import { writeSheet } from '../lib/sheet'
+
+export function planProseGeneration(
+  stages: Pick<StageState, 'caseStudyAt' | 'writeupAt'>,
+  force: boolean,
+): { caseStudy: boolean; writeup: boolean } {
+  const writeup = force || !stages.writeupAt
+  return {
+    caseStudy: force || writeup || !stages.caseStudyAt,
+    writeup,
+  }
+}
 
 /**
  * Turns each analyzed context bundle into a `description_markdown` body using
@@ -38,8 +59,14 @@ export async function writeup(args: ParsedArgs): Promise<void> {
       log.detail(`${entry.slug}: not analyzed yet — run \`pnpm ingest analyze ${entry.slug}\``)
       return
     }
-    if (!force && entry.stages.writeupAt) {
-      log.detail(`${entry.slug}: write-up already exists (--force to regenerate)`)
+    if (!entry.stages.assessedAt) {
+      throw new IngestError(
+        `${entry.slug}: repository not assessed yet — run \`pnpm ingest assess ${entry.slug}\``,
+      )
+    }
+    const generation = planProseGeneration(entry.stages, force)
+    if (!generation.writeup && !generation.caseStudy) {
+      log.detail(`${entry.slug}: write-up and case study already exist (--force to regenerate)`)
       return
     }
 
@@ -59,31 +86,37 @@ export async function writeup(args: ParsedArgs): Promise<void> {
 
     // Use the manifest title, which the user may have corrected since analyze.
     const briefing = { ...context, notes, title: entry.title }
-    const markdown = await generateWriteup(briefing)
-    await atomicWriteFile(writeupPath(entry.slug), `${markdown}\n`)
+    const markdown = generation.writeup
+      ? await generateWriteup(briefing)
+      : (await fs.readFile(writeupPath(entry.slug), 'utf8')).trim()
+    const assessment = await readJson<RepoAssessment>(repoAssessmentPath(entry.slug))
+    if (!assessment) {
+      throw new IngestError(`${entry.slug}: repo-assessment.json is missing — re-run assess`)
+    }
+    const caseStudy = preferWriteupSummary(
+      await generateCaseStudy({
+        assessment,
+        context: briefing,
+        notes,
+        writeup: markdown,
+      }),
+      markdown,
+    )
 
-    let caseStudy
-    try {
-      caseStudy = await generateCaseStudy(briefing)
-    } catch (error) {
-      log.warn(
-        `${entry.slug}: case-study generation failed (${error instanceof Error ? error.message : String(error)}) — writing stub`,
+    let completed = entry
+    if (generation.writeup) {
+      await atomicWriteFile(writeupPath(entry.slug), `${markdown}\n`)
+      completed = await recordStageCompletion(
+        entry.slug,
+        'writeup',
+        new Date().toISOString(),
+        notes,
       )
-      caseStudy = emptyCaseStudyStub()
     }
-
-    // The write-up's opening paragraph is the same 2–3 sentence layperson
-    // pitch `summary` wants, so a missing summary borrows it rather than
-    // shipping the field empty. It stays flagged in needsReview.
-    if (!caseStudy.summary) {
-      caseStudy.summary = summaryFromWriteup(markdown)
-    }
-
     await atomicWriteJson(caseStudyPath(entry.slug), caseStudy)
-
-    const completed = await recordStageCompletion(
+    completed = await recordStageCompletion(
       entry.slug,
-      'writeup',
+      'caseStudy',
       new Date().toISOString(),
       notes,
     )

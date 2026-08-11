@@ -8,7 +8,17 @@ import { log } from '../lib/log'
 import { loadManifest } from '../lib/manifest'
 import { entryDir, MANIFEST_PATH, rel } from '../lib/paths'
 
-const STAGES = ['analyze', 'writeup', 'shots', 'ready'] as const
+const STAGES = ['analyze', 'assess', 'writeup', 'case', 'shots', 'ready'] as const
+
+export function isEntryReady(entry: ManifestEntry, hasSheet: boolean): boolean {
+  return Boolean(
+    !entry.skip &&
+    hasSheet &&
+    entry.stages.assessedAt &&
+    entry.stages.writeupAt &&
+    entry.stages.caseStudyAt,
+  )
+}
 
 /**
  * Prints a per-entry stage matrix. `ready` means the manual-entry checklist
@@ -38,7 +48,7 @@ export async function status(args: ParsedArgs): Promise<void> {
 
   for (const entry of entries) {
     const hasSheet = await exists(path.join(entryDir(entry.slug), 'ENTER-ME.md'))
-    if (hasSheet && !entry.skip) {
+    if (isEntryReady(entry, hasSheet)) {
       ready += 1
     }
 
@@ -72,11 +82,15 @@ function mark(entry: ManifestEntry, stage: (typeof STAGES)[number], hasSheet: bo
   const done =
     stage === 'analyze'
       ? entry.stages.analyzedAt
-      : stage === 'writeup'
-        ? entry.stages.writeupAt
-        : stage === 'shots'
-          ? entry.stages.shotsAt
-          : hasSheet
+      : stage === 'assess'
+        ? entry.stages.assessedAt
+        : stage === 'writeup'
+          ? entry.stages.writeupAt
+          : stage === 'case'
+            ? entry.stages.caseStudyAt
+            : stage === 'shots'
+              ? entry.stages.shotsAt
+              : isEntryReady(entry, hasSheet)
   return done ? '  ok' : '   ·'
 }
 

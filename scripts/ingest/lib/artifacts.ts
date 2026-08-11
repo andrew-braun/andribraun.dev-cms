@@ -2,8 +2,9 @@ import { createHash, randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import type { CapturedShot, Manifest, ManifestEntry } from './types'
+import type { CapturedShot, EntryContext, Manifest, ManifestEntry } from './types'
 
+import { validateCaseStudySidecar } from './caseStudy'
 import { IngestError } from './log'
 import {
   assertNoSymlinkComponents,
@@ -12,6 +13,7 @@ import {
   resolveContained,
   WORK_DIR,
 } from './paths'
+import { validateStoredRepoAssessment } from './repoAssessment'
 import { validateCapturedShots, validateManifest } from './validation'
 
 export async function atomicWriteFile(
@@ -148,6 +150,8 @@ export function fingerprintsFor(
   notes: string | undefined,
 ): {
   analysis: string
+  assessment: string
+  caseStudy: string
   shots: string
   writeup: string
 } {
@@ -156,6 +160,15 @@ export function fingerprintsFor(
       githubLink: entry.githubLink,
       liveUrl: entry.liveUrl,
       repo: entry.repo,
+    }),
+    assessment: digest({
+      analysisArtifact: entry.stages.analysisArtifact,
+      contractVersion: 1,
+    }),
+    caseStudy: digest({
+      assessmentInput: entry.stages.assessmentInput,
+      contractVersion: 1,
+      writeupInput: entry.stages.writeupInput,
     }),
     shots: digest({
       hero: entry.hero,
@@ -174,9 +187,18 @@ export function fingerprintsFor(
 }
 
 export function invalidateDerivedArtifacts(
-  stage: 'analysis' | 'shots' | 'writeup',
-): Array<'caseStudy' | 'writeup'> {
-  return stage === 'analysis' || stage === 'shots' ? ['writeup', 'caseStudy'] : []
+  stage: 'analysis' | 'assessment' | 'caseStudy' | 'shots' | 'writeup',
+): Array<'assessment' | 'caseStudy' | 'writeup'> {
+  if (stage === 'analysis') {
+    return ['assessment', 'writeup', 'caseStudy']
+  }
+  if (stage === 'assessment' || stage === 'writeup') {
+    return ['caseStudy']
+  }
+  if (stage === 'shots') {
+    return ['writeup', 'caseStudy']
+  }
+  return []
 }
 
 export interface ArtifactRoots {
@@ -186,12 +208,13 @@ export interface ArtifactRoots {
 
 const DEFAULT_ROOTS: ArtifactRoots = { manifestPath: MANIFEST_PATH, workDir: WORK_DIR }
 
-type GeneratedStage = 'analysis' | 'caseStudy' | 'shots' | 'writeup'
+type GeneratedStage = 'analysis' | 'assessment' | 'caseStudy' | 'shots' | 'writeup'
 
 function stagePaths(slug: string, roots: ArtifactRoots): Record<GeneratedStage, string[]> {
   const dir = resolveContained(roots.workDir, slug)
   return {
     analysis: [resolveContained(dir, 'context.json'), resolveContained(dir, 'context.md')],
+    assessment: [resolveContained(dir, 'repo-assessment.json')],
     caseStudy: [resolveContained(dir, 'case-study.json')],
     shots: [resolveContained(dir, 'shots'), resolveContained(dir, 'shots.json')],
     writeup: [resolveContained(dir, 'writeup.md')],
@@ -199,7 +222,7 @@ function stagePaths(slug: string, roots: ArtifactRoots): Record<GeneratedStage, 
 }
 
 async function hasValidArtifact(
-  stage: 'analysis' | 'shots' | 'writeup',
+  stage: 'analysis' | 'assessment' | 'caseStudy' | 'shots' | 'writeup',
   paths: string[],
 ): Promise<boolean> {
   const required = stage === 'shots' ? paths[1] : paths[0]
@@ -224,10 +247,20 @@ async function removeStage(
   await Promise.all(paths[stage].map((target) => fs.rm(target, { force: true, recursive: true })))
 }
 
-function clearStage(entry: ManifestEntry, stage: 'analysis' | 'shots' | 'writeup'): void {
+function clearStage(
+  entry: ManifestEntry,
+  stage: 'analysis' | 'assessment' | 'caseStudy' | 'shots' | 'writeup',
+): void {
   if (stage === 'analysis') {
+    delete entry.stages.analysisArtifact
     delete entry.stages.analyzedAt
     delete entry.stages.analysisInput
+  } else if (stage === 'assessment') {
+    delete entry.stages.assessedAt
+    delete entry.stages.assessmentInput
+  } else if (stage === 'caseStudy') {
+    delete entry.stages.caseStudyAt
+    delete entry.stages.caseStudyInput
   } else if (stage === 'shots') {
     delete entry.stages.shotsAt
     delete entry.stages.shotsInput
@@ -239,18 +272,13 @@ function clearStage(entry: ManifestEntry, stage: 'analysis' | 'shots' | 'writeup
 
 async function invalidate(
   entry: ManifestEntry,
-  stage: 'analysis' | 'shots' | 'writeup',
+  stage: 'analysis' | 'assessment' | 'caseStudy' | 'shots' | 'writeup',
   paths: Record<GeneratedStage, string[]>,
 ): Promise<void> {
   clearStage(entry, stage)
   await removeStage(stage, paths)
-  if (stage === 'writeup') {
-    await removeStage('caseStudy', paths)
-  }
   for (const downstream of invalidateDerivedArtifacts(stage)) {
-    if (downstream === 'writeup') {
-      clearStage(entry, 'writeup')
-    }
+    clearStage(entry, downstream)
     await removeStage(downstream, paths)
   }
 }
@@ -291,9 +319,20 @@ export async function reconcileEntryArtifacts(
   const current = fingerprintsFor(entry, notes)
   const stages = [
     ['analysis', 'analyzedAt', 'analysisInput'],
+    ['assessment', 'assessedAt', 'assessmentInput'],
     ['shots', 'shotsAt', 'shotsInput'],
     ['writeup', 'writeupAt', 'writeupInput'],
+    ['caseStudy', 'caseStudyAt', 'caseStudyInput'],
   ] as const
+
+  if (entry.stages.analyzedAt && !entry.stages.analysisArtifact) {
+    const rawContext = JSON.parse(await fs.readFile(paths.analysis[0], 'utf8')) as Record<
+      string,
+      unknown
+    >
+    const { gatheredAt: _gatheredAt, ...stableContext } = rawContext
+    entry.stages.analysisArtifact = digest(stableContext)
+  }
 
   for (const [stage, timestampKey, fingerprintKey] of stages) {
     const timestamp = entry.stages[timestampKey]
@@ -304,7 +343,26 @@ export async function reconcileEntryArtifacts(
       }
       continue
     }
-    if (!(await hasValidArtifact(stage, paths[stage]))) {
+    let valid = await hasValidArtifact(stage, paths[stage])
+    if (valid && stage === 'assessment') {
+      try {
+        const context = JSON.parse(await fs.readFile(paths.analysis[0], 'utf8')) as EntryContext
+        const assessment = JSON.parse(await fs.readFile(paths.assessment[0], 'utf8')) as unknown
+        validateStoredRepoAssessment(assessment, context, entry.stages.analysisArtifact ?? '')
+      } catch {
+        valid = false
+      }
+    }
+    if (valid && stage === 'caseStudy') {
+      try {
+        validateCaseStudySidecar(
+          JSON.parse(await fs.readFile(paths.caseStudy[0], 'utf8')) as unknown,
+        )
+      } catch {
+        valid = false
+      }
+    }
+    if (!valid) {
       await invalidate(entry, stage, paths)
       continue
     }
@@ -323,7 +381,7 @@ export async function reconcileEntryArtifacts(
 
 export async function recordStageCompletion(
   slug: string,
-  stage: 'analysis' | 'shots' | 'writeup',
+  stage: 'analysis' | 'assessment' | 'caseStudy' | 'shots' | 'writeup',
   completedAt: string,
   notes: string | undefined,
   roots: ArtifactRoots = DEFAULT_ROOTS,
@@ -332,16 +390,26 @@ export async function recordStageCompletion(
   const paths = stagePaths(slug, roots)
 
   for (const downstream of invalidateDerivedArtifacts(stage)) {
-    if (downstream === 'writeup') {
-      clearStage(entry, 'writeup')
-    }
+    clearStage(entry, downstream)
     await removeStage(downstream, paths)
   }
 
   const current = fingerprintsFor(entry, notes)
   if (stage === 'analysis') {
+    const rawContext = JSON.parse(await fs.readFile(paths.analysis[0], 'utf8')) as Record<
+      string,
+      unknown
+    >
+    const { gatheredAt: _gatheredAt, ...stableContext } = rawContext
+    entry.stages.analysisArtifact = digest(stableContext)
     entry.stages.analyzedAt = completedAt
     entry.stages.analysisInput = current.analysis
+  } else if (stage === 'assessment') {
+    entry.stages.assessedAt = completedAt
+    entry.stages.assessmentInput = fingerprintsFor(entry, notes).assessment
+  } else if (stage === 'caseStudy') {
+    entry.stages.caseStudyAt = completedAt
+    entry.stages.caseStudyInput = fingerprintsFor(entry, notes).caseStudy
   } else if (stage === 'shots') {
     entry.stages.shotsAt = completedAt
     entry.stages.shotsInput = current.shots

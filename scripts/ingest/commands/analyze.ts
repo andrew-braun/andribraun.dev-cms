@@ -97,5 +97,5 @@ export async function analyze(args: ParsedArgs): Promise<void> {
   })
 
   log.info('')
-  log.detail('Next: pnpm ingest writeup')
+  log.detail('Next: pnpm ingest assess')
 }

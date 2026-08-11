@@ -29,6 +29,7 @@ captures 2560x1440 screenshots of the live sites with AI-generated alt text.
 ```bash
 pnpm ingest discover     # scan GitHub / accept site URLs -> ingest/manifest.json
 pnpm ingest analyze      # gather repo context + probe the live site
+pnpm ingest assess       # build a cited AI repository assessment
 pnpm ingest notes        # optional: hand-written background -> ingest/notes/
 pnpm ingest writeup      # generate description_markdown
 pnpm ingest shots        # capture screenshots + alt text

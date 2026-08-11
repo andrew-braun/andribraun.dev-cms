@@ -6,10 +6,13 @@ import type { ProjectResolution } from '../lib/projectResolution'
 import type { CapturedShot, ManifestEntry } from '../lib/types'
 
 import { flagBoolean, type ParsedArgs } from '../lib/args'
+import { reconcileEntryArtifacts } from '../lib/artifacts'
 import { localBackend, remoteBackend } from '../lib/backend'
 import { runBatch } from '../lib/batch'
-import { log } from '../lib/log'
+import { validateCaseStudySidecar } from '../lib/caseStudy'
+import { IngestError, log } from '../lib/log'
 import { loadManifest, readJson, selectEntries, updateEntry } from '../lib/manifest'
+import { readNotes } from '../lib/notes'
 import {
   caseStudyPath,
   resolveContained,
@@ -45,7 +48,11 @@ const defaultPublishDependencies: PublishEntryDependencies = {
   async loadAndValidateArtifacts(entry) {
     const markdown = (await fs.readFile(writeupPath(entry.slug), 'utf8')).trim()
     const shots = (await readJson<CapturedShot[]>(shotsManifestPath(entry.slug))) ?? []
-    const caseStudy = await readJson<CaseStudySidecar>(caseStudyPath(entry.slug))
+    const caseStudyRaw = await readJson<unknown>(caseStudyPath(entry.slug))
+    if (!caseStudyRaw) {
+      throw new IngestError(`${entry.slug}: case-study.json is missing — re-run writeup`)
+    }
+    const caseStudy = validateCaseStudySidecar(caseStudyRaw)
     if (shots.length > 0) {
       await validateCapturedShots(shots, shotsDir(entry.slug))
     }
@@ -64,6 +71,21 @@ const defaultPublishDependencies: PublishEntryDependencies = {
     })
   },
   resolve: resolveProject,
+}
+
+export function publicationReadinessIssue(
+  entry: ManifestEntry,
+): 'case study' | 'repository assessment' | 'write-up' | undefined {
+  if (!entry.stages.assessedAt) {
+    return 'repository assessment'
+  }
+  if (!entry.stages.writeupAt) {
+    return 'write-up'
+  }
+  if (!entry.stages.caseStudyAt) {
+    return 'case study'
+  }
+  return undefined
 }
 
 export async function publishEntry(
@@ -174,13 +196,20 @@ export async function publish(args: ParsedArgs): Promise<void> {
   const visibility = flagBoolean(args, 'visible')
   const skipTech = flagBoolean(args, 'no-tech') ?? false
 
-  const ready = entries.filter((entry) => {
-    if (!entry.stages.writeupAt) {
-      log.detail(`${entry.slug}: no write-up yet — skipping`)
-      return false
+  const ready: ManifestEntry[] = []
+  for (const selected of entries) {
+    const entry = await reconcileEntryArtifacts(selected.slug, await readNotes(selected.slug))
+    const issue = publicationReadinessIssue(entry)
+    if (issue) {
+      log.detail(`${entry.slug}: no current ${issue} — skipping`)
+      continue
     }
-    return true
-  })
+    if (!(await readJson<CaseStudySidecar>(caseStudyPath(entry.slug)))) {
+      log.detail(`${entry.slug}: no valid case study yet — skipping`)
+      continue
+    }
+    ready.push(entry)
+  }
 
   if (ready.length === 0) {
     log.warn('Nothing ready to publish. Run the writeup stage first.')

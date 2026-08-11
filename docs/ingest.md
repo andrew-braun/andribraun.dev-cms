@@ -11,7 +11,7 @@ checklist you can follow by hand. Nothing reaches a CMS until you run
 straight to production over the REST API.
 
 ```text
-discover ──▶ analyze ──▶ writeup ──▶ shots ──▶ ENTER-ME.md ──▶ you, in /admin
+discover ──▶ analyze ──▶ assess ──▶ writeup ──▶ shots ──▶ ENTER-ME.md ──▶ publish
    │            │   ▲       │          │
 manifest    context.md      │      shots/*.png
                     │    writeup.md  shots.json
@@ -36,6 +36,7 @@ manifest    context.md      │      shots/*.png
 pnpm ingest discover                     # scan your GitHub account
 $EDITOR ingest/manifest.json             # set titles, unskip what you want
 pnpm ingest analyze
+pnpm ingest assess                       # cited repo assessment; explicit unavailable state without a repo
 pnpm ingest notes                        # optional; then fill the files in
 pnpm ingest writeup
 pnpm ingest shots
@@ -199,10 +200,19 @@ description, framework fingerprints, and navigation links. No clone is
 performed. Writes `context.json` and the human-readable `context.md`, folding in
 `ingest/notes/<slug>.md` when one exists.
 
+**`assess`** — asks Claude to synthesize the analyzed repository into
+`repo-assessment.json`. Every substantive finding must cite an exact file path
+whose contents were gathered by `analyze`; unknown paths and uncited claims are
+rejected. Projects without repositories receive an explicit `unavailable`
+assessment, so site-and-notes-only work remains processable. `--force`
+regenerates the artifact.
+
 **`notes`** — scaffolds `ingest/notes/<slug>.md` for entries that don't have one.
 See [Background notes](#background-notes).
 
-**`writeup`** — sends the context briefing to Claude twice:
+**`writeup`** — sends the raw context briefing to Claude for the narrative, then
+sends only the completed write-up, notes, compact site metadata, and validated
+repository assessment for the case study:
 
 1. With `ai/project.summary-instructions.md` → `writeup.md` (technical
    `description_markdown`, including `<span class="tech" data-tag="...">` tags).
@@ -215,10 +225,10 @@ only `description_markdown` feeds technology extraction. When the model omits
 it, the write-up's opening paragraph is used instead (spans stripped), and
 `summary` stays on the `needsReview` list so you give it a second look.
 
-Edit either file freely before pasting into admin; the checklist always points
-at the current files. `--force` regenerates both. If case-study generation
-fails, a stub sidecar with every field flagged for review is written so the
-write-up stage can still succeed.
+Edit either file freely before publishing; the checklist always points at the
+current files. `--force` regenerates both. Incomplete (`max_tokens`), malformed,
+or schema-invalid structured output is a hard failure: the previous valid
+artifacts remain in place and the stage is not marked complete.
 
 ### Description sections
 
